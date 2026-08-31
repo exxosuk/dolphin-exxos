@@ -6,6 +6,8 @@
 
 #include "dolphinitemlistview.h"
 
+#include "kitemviews/kitemmodelbase.h"   // Exxos/Win7 tile grid: model signals
+
 #include "dolphin_compactmodesettings.h"
 #include "dolphin_detailsmodesettings.h"
 #include "dolphin_generalsettings.h"
@@ -20,7 +22,8 @@
 
 DolphinItemListView::DolphinItemListView(QGraphicsWidget* parent) :
     KFileItemListView(parent),
-    m_zoomLevel(0)
+    m_zoomLevel(0),
+    m_hasCapacityItems(false)
 {
     updateFont();
     updateGridSize();
@@ -159,6 +162,52 @@ void DolphinItemListView::updateFont()
     }
 }
 
+/* True when any item in the current view advertises drive capacity, i.e. the
+   model carries the "totalSpace" role. Only the first few items are checked --
+   a location either is a drive list or is not, and this runs on every grid
+   recalculation. */
+bool DolphinItemListView::viewHasCapacityItems() const
+{
+    const KItemModelBase* m = model();
+    if (!m) {
+        return false;
+    }
+    const int probe = qMin(m->count(), 5);
+    for (int i = 0; i < probe; ++i) {
+        if (m->data(i).value("totalSpace").toULongLong() > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Exxos/Win7: watch the model so the tile grid can be applied once items load. */
+void DolphinItemListView::onModelChanged(KItemModelBase* current, KItemModelBase* previous)
+{
+    KFileItemListView::onModelChanged(current, previous);
+    if (previous) {
+        disconnect(previous, nullptr, this, nullptr);
+    }
+    if (current) {
+        connect(current, &KItemModelBase::itemsInserted,
+                this, &DolphinItemListView::slotCapacityItemsMayHaveChanged);
+        connect(current, &KItemModelBase::itemsRemoved,
+                this, &DolphinItemListView::slotCapacityItemsMayHaveChanged);
+    }
+    slotCapacityItemsMayHaveChanged();
+}
+
+/* Only relayout when the answer actually CHANGES -- itemsInserted fires
+   repeatedly while a directory loads, and updateGridSize() is not cheap. */
+void DolphinItemListView::slotCapacityItemsMayHaveChanged()
+{
+    const bool now = viewHasCapacityItems();
+    if (now != m_hasCapacityItems) {
+        m_hasCapacityItems = now;
+        updateGridSize();
+    }
+}
+
 void DolphinItemListView::updateGridSize()
 {
     const ViewModeSettings settings(itemLayout());
@@ -194,9 +243,29 @@ void DolphinItemListView::updateGridSize()
 
         itemHeight = padding * 3 + iconSize + option.fontMetrics.lineSpacing();
 
-        horizontalMargin = 4;
-        verticalMargin = 8;
-        maxTextLines = IconsModeSettings::maximumTextLines();
+        /* Exxos/Win7 tile grid.
+           When the current location advertises drive capacity (the computer:/
+           worker does), Explorer lays the drives out as WIDE, SHORT tiles
+           flowed into several columns -- icon left, name / bar / free-space
+           text stacked to its right.  The cell therefore has to be wide enough
+           for the icon plus a ~220px bar, and only tall enough for three lines
+           of text or the icon, whichever is larger.
+
+           This is decided per LOCATION, not globally: viewHasCapacityItems()
+           inspects the model, so ordinary folders keep the normal icon grid. */
+        if (viewHasCapacityItems()) {
+            const int barWidth  = 220;
+            const int textBlock = 3 * option.fontMetrics.lineSpacing();
+            itemWidth  = padding * 4 + iconSize + barWidth;
+            itemHeight = padding * 3 + qMax(iconSize, textBlock);
+            horizontalMargin = 8;
+            verticalMargin = 4;
+            maxTextLines = 1;
+        }
+
+        horizontalMargin = horizontalMargin ? horizontalMargin : 4;
+        verticalMargin = verticalMargin ? verticalMargin : 8;
+        maxTextLines = maxTextLines ? maxTextLines : IconsModeSettings::maximumTextLines();
         break;
     }
     case KFileItemListView::CompactLayout: {

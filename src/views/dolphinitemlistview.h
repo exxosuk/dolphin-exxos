@@ -58,6 +58,11 @@ protected:
 
     void updateFont() override;
 
+    /* Exxos/Win7: the capacity check needs the model, and the model is empty
+       when updateGridSize() first runs, so the grid is recalculated once the
+       items actually arrive. */
+    void onModelChanged(KItemModelBase* current, KItemModelBase* previous) override;
+
 private:
     void updateGridSize();
 
@@ -65,8 +70,18 @@ private:
                                                      // the one from the base class so we can still use it privately.
     SelectionTogglesEnabled m_selectionTogglesEnabled = FollowSetting;
 
+    /* Exxos/Win7: true when the current location advertises drive capacity,
+       which switches the icons grid to wide Explorer-style tiles. */
+    bool viewHasCapacityItems() const;
+
+    ViewModeSettings::ViewMode viewMode() const;
+
+private slots:
+    void slotCapacityItemsMayHaveChanged();
+
 private:
     int m_zoomLevel;
+    bool m_hasCapacityItems;   // Exxos/Win7: last known state, to avoid needless relayouts
 };
 
 #endif

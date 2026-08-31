@@ -996,7 +996,9 @@ void KStandardItemListWidget::updatePixmapCache()
     // the remaining height when the alignment is vertical.
 
     const QSizeF widgetSize = size();
-    const bool iconOnTop = (m_layout == IconsLayout);
+    /* Exxos/Win7: a capacity tile always puts the icon on the LEFT, in icons
+       layout as well as details, because that is how Explorer draws it. */
+    const bool iconOnTop = (m_layout == IconsLayout) && !m_isTile;
     const KItemListStyleOption& option = styleOption();
     const qreal padding = option.padding;
 
@@ -1251,6 +1253,13 @@ QString KStandardItemListWidget::elideRightKeepExtension(const QString &text, in
 
 void KStandardItemListWidget::updateIconsLayoutTextCache()
 {
+    /* Exxos/Win7: in icons layout a capacity item is drawn as a tile too.
+       Icon view flows items into MULTIPLE COLUMNS, which is how Explorer's
+       Computer view actually looks, so this is the closer match of the two. */
+    if (hasCapacityInfo()) {
+        updateTilesLayoutTextCache();
+        return;
+    }
     m_isTile = false;
     //      +------+
     //      | Icon |
@@ -1475,7 +1484,11 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
     m_totalSpace = values.value("totalSpace").toULongLong();
 
     const qreal widgetHeight = size().height();
-    const int scaledIconSize = widgetHeight - 2 * option.padding;
+    /* In details layout the row height defines the icon box; in icons layout
+       the cell is taller than the icon, so the configured icon size is used. */
+    const int scaledIconSize = (m_layout == IconsLayout)
+                             ? option.iconSize
+                             : int(widgetHeight - 2 * option.padding);
 
     // Text column starts just right of the icon, as in Explorer.
     const qreal x = scaledIconSize + 2 * option.padding;
