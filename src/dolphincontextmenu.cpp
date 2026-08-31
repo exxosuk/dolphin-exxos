@@ -206,7 +206,7 @@ void DolphinContextMenu::addItemContextMenu()
 
             addAction(QIcon::fromTheme(QStringLiteral("document-open-folder")),
                                            i18nc("@action:inmenu",
-                                                 "Open Path"),
+                                                 "Open Containing Folder"),
                                            [this](){
                 m_mainWindow->changeUrl(KIO::upUrl(m_fileInfo.url()));
                 m_mainWindow->activeViewContainer()->view()->markUrlsAsSelected({m_fileInfo.url()});
@@ -215,14 +215,14 @@ void DolphinContextMenu::addItemContextMenu()
 
             addAction(QIcon::fromTheme(QStringLiteral("window-new")),
                                                     i18nc("@action:inmenu",
-                                                          "Open Path in New Window"),
+                                                          "Open Containing Folder in New Window"),
                                                     [this](){
                 Dolphin::openNewWindow({m_fileInfo.url()}, m_mainWindow, Dolphin::OpenNewWindowFlag::Select);
             });
 
             addAction(QIcon::fromTheme(QStringLiteral("tab-new")),
                                                    i18nc("@action:inmenu",
-                                                         "Open Path in New Tab"),
+                                                         "Open Containing Folder in New Tab"),
                                                    [this](){
                 m_mainWindow->openNewTab(KIO::upUrl(m_fileInfo.url()));
             });

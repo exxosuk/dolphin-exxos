@@ -17,6 +17,13 @@
 #include "userfeedback/dolphinfeedbackprovider.h"
 #endif
 
+#include <KApplicationTrader>
+#include <KMessageBox>
+#include <KService>
+#include <KSharedConfig>
+#include <KConfigGroup>
+#include <QTimer>
+#include <QStandardPaths>
 #include <KAboutData>
 
 /* Version of the Exxos Edition patch set itself, independent of the Dolphin
@@ -44,6 +51,68 @@
 #include <unistd.h>
 #endif
 #include <iostream>
+
+
+/* ---------------------------------------------------------------------------
+   Exxos Edition: offer to become the default file manager.
+
+   The package installs alongside the stock Dolphin rather than replacing it
+   (see DOLPHIN-PATCHES.md section 12), so opening a folder from another
+   application still goes to whichever file manager is registered for
+   inode/directory. This asks once whether to change that, and remembers a
+   "no" so it never nags.
+
+   Nothing is changed without the user agreeing: the only write is to
+   ~/.config/mimeapps.list, which is per-user and reversible from
+   System Settings -> Applications -> File Associations.
+   --------------------------------------------------------------------------- */
+static void exxosOfferToBecomeDefaultFileManager(QWidget *parent)
+{
+    const QString ourDesktop = QStringLiteral("dolphin-exxos.desktop");
+
+    // Only meaningful once the package is installed; running straight from the
+    // build tree there is no .desktop file to register.
+    if (QStandardPaths::locate(QStandardPaths::ApplicationsLocation, ourDesktop).isEmpty()) {
+        return;
+    }
+
+    const KService::Ptr current = KApplicationTrader::preferredService(QStringLiteral("inode/directory"));
+    if (current && current->desktopEntryName() == QLatin1String("dolphin-exxos")) {
+        return;   // already the default
+    }
+
+    const QString currentName = current ? current->name() : i18n("(none)");
+    const int answer = KMessageBox::questionYesNo(
+        parent,
+        i18n("<para>Folders currently open in <application>%1</application>.</para>"
+             "<para>Make <application>Dolphin Exxos Edition</application> the default "
+             "file manager instead?</para>", currentName),
+        i18nc("@title:window", "Default File Manager"),
+        KGuiItem(i18nc("@action:button", "Make Default"), QStringLiteral("dialog-ok")),
+        KGuiItem(i18nc("@action:button", "Keep %1", currentName), QStringLiteral("dialog-cancel")),
+        QStringLiteral("exxosAskDefaultFileManager"));   // remembers "no"
+
+    if (answer != KMessageBox::Yes) {
+        return;
+    }
+
+    KSharedConfig::Ptr mimeApps = KSharedConfig::openConfig(QStringLiteral("mimeapps.list"),
+                                                           KConfig::NoGlobals,
+                                                           QStandardPaths::GenericConfigLocation);
+    KConfigGroup defaults(mimeApps, "Default Applications");
+    KConfigGroup added(mimeApps, "Added Associations");
+    // all three are used by different applications to mean "a folder"
+    for (const QString &mime : { QStringLiteral("inode/directory"),
+                                 QStringLiteral("x-directory/normal"),
+                                 QStringLiteral("application/x-directory") }) {
+        defaults.writeXdgListEntry(mime, QStringList{ ourDesktop });
+        QStringList assoc = added.readXdgListEntry(mime);
+        assoc.removeAll(ourDesktop);
+        assoc.prepend(ourDesktop);
+        added.writeXdgListEntry(mime, assoc);
+    }
+    mimeApps->sync();
+}
 
 int main(int argc, char **argv)
 {
@@ -272,6 +341,13 @@ int main(int argc, char **argv)
     auto feedbackProvider = DolphinFeedbackProvider::instance();
     Q_UNUSED(feedbackProvider)
 #endif
+
+    /* Exxos: ask once, after the window is up, whether to become the default
+       file manager. Deferred with a zero timer so the dialog appears over the
+       main window rather than blocking before the event loop starts. */
+    QTimer::singleShot(0, mainWindow, [mainWindow]() {
+        exxosOfferToBecomeDefaultFileManager(mainWindow);
+    });
 
     return app.exec(); // krazy:exclude=crash;
 }
