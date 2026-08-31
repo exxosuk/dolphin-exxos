@@ -411,10 +411,12 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
        background and any selection highlight. */
     if (m_isTile) {
         drawCapacityBar(painter);
-        painter->setFont(m_customizedFont);
-        painter->setPen(m_additionalInfoTextColor);
-        painter->drawStaticText(m_capacityFreeTextPos, m_capacityFreeText);
-        painter->setPen(textColor());
+        if (!m_capacityFreeText.text().isEmpty()) {
+            painter->setFont(m_customizedFont);
+            painter->setPen(m_additionalInfoTextColor);
+            painter->drawStaticText(m_capacityFreeTextPos, m_capacityFreeText);
+            painter->setPen(textColor());
+        }
     }
 
     bool clipAdditionalInfoBounds = false;
@@ -1256,7 +1258,11 @@ void KStandardItemListWidget::updateIconsLayoutTextCache()
     /* Exxos/Win7: in icons layout a capacity item is drawn as a tile too.
        Icon view flows items into MULTIPLE COLUMNS, which is how Explorer's
        Computer view actually looks, so this is the closer match of the two. */
-    if (hasCapacityInfo()) {
+    if (styleOption().tileLayout) {
+        /* Every item in a tile view uses the tile alignment, including ones
+           with no capacity data (the Network shortcut, unmounted devices).
+           Otherwise they fall back to a centred icon-on-top and visibly drift
+           right, out of line with the drives. */
         updateTilesLayoutTextCache();
         return;
     }
@@ -1480,8 +1486,13 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
     const KItemListStyleOption& option = styleOption();
     const QHash<QByteArray, QVariant> values = data();
 
-    m_freeSpace  = values.value("freeSpace").toULongLong();
-    m_totalSpace = values.value("totalSpace").toULongLong();
+    /* An item may sit in a tile view without advertising capacity -- the
+       Network shortcut, or a device that is not mounted. It still gets the
+       tile ALIGNMENT so it lines up with the drives; it just has no bar and no
+       free-space line, and its name is centred vertically instead. */
+    const bool hasCap = hasCapacityInfo();
+    m_freeSpace  = hasCap ? values.value("freeSpace").toULongLong()  : 0;
+    m_totalSpace = hasCap ? values.value("totalSpace").toULongLong() : 0;
 
     const qreal widgetHeight = size().height();
     /* In details layout the row height defines the icon box; in icons layout
@@ -1503,7 +1514,8 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
     const int barHeight  = qMax(9, freeHeight - 4);
     const qreal gap      = qMax(qreal(1), qreal(option.padding) / 2);
 
-    const qreal blockHeight = nameHeight + gap + barHeight + gap + freeHeight;
+    const qreal blockHeight = hasCap ? (nameHeight + gap + barHeight + gap + freeHeight)
+                                    : nameHeight;
     qreal y = qMax(qreal(option.padding), (widgetHeight - blockHeight) / 2);
 
     // --- line 1: the drive name, bold ---
@@ -1518,22 +1530,28 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
         m_textRect = QRectF(x - option.padding, 0,
                             availableWidth + 2 * option.padding, widgetHeight);
     }
-    y += nameHeight + gap;
+    if (!hasCap) {
+        // no bar, no free-space line
+        m_capacityBarRect = QRectF();
+        m_capacityFreeText.setText(QString());
+    } else {
+        y += nameHeight + gap;
 
-    // --- line 2: the capacity bar ---
-    const qreal barWidth = qMin(availableWidth, qreal(220));
-    m_capacityBarRect = QRectF(x, y, barWidth, barHeight);
-    y += barHeight + gap;
+        // --- line 2: the capacity bar ---
+        const qreal barWidth = qMin(availableWidth, qreal(220));
+        m_capacityBarRect = QRectF(x, y, barWidth, barHeight);
+        y += barHeight + gap;
 
-    // --- line 3: "<free> free of <total>" ---
-    const QString freeText = i18nc("@info:status free disk space on a device",
-                                   "%1 free of %2",
-                                   win7Size(m_freeSpace),
-                                   win7Size(m_totalSpace));
-    m_capacityFreeText.setText(m_customizedFontMetrics.horizontalAdvance(freeText) > availableWidth
-                               ? m_customizedFontMetrics.elidedText(freeText, Qt::ElideRight, availableWidth)
-                               : freeText);
-    m_capacityFreeTextPos = QPointF(x, y);
+        // --- line 3: "<free> free of <total>" ---
+        const QString freeText = i18nc("@info:status free disk space on a device",
+                                       "%1 free of %2",
+                                       win7Size(m_freeSpace),
+                                       win7Size(m_totalSpace));
+        m_capacityFreeText.setText(m_customizedFontMetrics.horizontalAdvance(freeText) > availableWidth
+                                   ? m_customizedFontMetrics.elidedText(freeText, Qt::ElideRight, availableWidth)
+                                   : freeText);
+        m_capacityFreeTextPos = QPointF(x, y);
+    }
 
     /* Every other visible role is pushed off-widget.  In a tile the name, bar
        and free-space line ARE the content; leaving Size/Modified to paint over

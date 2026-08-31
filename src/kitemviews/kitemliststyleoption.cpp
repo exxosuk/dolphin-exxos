@@ -18,7 +18,8 @@ KItemListStyleOption::KItemListStyleOption() :
     iconSize(-1),
     extendedSelectionRegion(false),
     maxTextLines(0),
-    maxTextWidth(0)
+    maxTextWidth(0),
+    tileLayout(false)
 {
 }
 
@@ -38,7 +39,8 @@ bool KItemListStyleOption::operator==(const KItemListStyleOption& other) const
             && iconSize == other.iconSize
             && extendedSelectionRegion == other.extendedSelectionRegion
             && maxTextLines == other.maxTextLines
-            && maxTextWidth == other.maxTextWidth;
+            && maxTextWidth == other.maxTextWidth &&
+           tileLayout == other.tileLayout;
 }
 
 bool KItemListStyleOption::operator!=(const KItemListStyleOption& other) const

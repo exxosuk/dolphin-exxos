@@ -226,6 +226,7 @@ void DolphinItemListView::updateGridSize()
     int itemHeight;
     int maxTextLines = 0;
     int maxTextWidth = 0;
+    bool tileLayout = false;   // Exxos/Win7 tile grid
 
     switch (itemLayout()) {
     case KFileItemListView::IconsLayout: {
@@ -253,7 +254,8 @@ void DolphinItemListView::updateGridSize()
 
            This is decided per LOCATION, not globally: viewHasCapacityItems()
            inspects the model, so ordinary folders keep the normal icon grid. */
-        if (viewHasCapacityItems()) {
+        tileLayout = viewHasCapacityItems();
+        if (tileLayout) {
             const int barWidth  = 220;
             const int textBlock = 3 * option.fontMetrics.lineSpacing();
             itemWidth  = padding * 4 + iconSize + barWidth;
@@ -301,6 +303,7 @@ void DolphinItemListView::updateGridSize()
     option.iconSize = iconSize;
     option.maxTextLines = maxTextLines;
     option.maxTextWidth = maxTextWidth;
+    option.tileLayout = tileLayout;
     beginTransaction();
     setStyleOption(option);
     setItemSize(QSizeF(itemWidth, itemHeight));
