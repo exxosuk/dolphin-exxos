@@ -6,6 +6,9 @@
 
 #include "kstandarditemlistwidget.h"
 
+#include <KIO/Global>          // KIO::convertSize, for the tile view free-space text
+#include <KLocalizedString>    // i18nc, for the tile view free-space text
+
 #include "kfileitemlistview.h"
 #include "kfileitemmodel.h"
 #include "private/kfileitemclipboard.h"
@@ -247,6 +250,9 @@ KStandardItemListWidget::KStandardItemListWidget(KItemListWidgetInformant* infor
     m_dirtyContent(true),
     m_dirtyContentRoles(),
     m_layout(IconsLayout),
+    m_isTile(false),
+    m_freeSpace(0),
+    m_totalSpace(0),
     m_pixmapPos(),
     m_pixmap(),
     m_scaledPixmapSize(),
@@ -378,7 +384,14 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
         drawPixmap(painter, m_pixmap);
     }
 
-    painter->setFont(m_customizedFont);
+    /* Exxos/Win7 tile: the drive name is bold, as in Explorer. */
+    if (m_isTile) {
+        QFont boldFont = m_customizedFont;
+        boldFont.setBold(true);
+        painter->setFont(boldFont);
+    } else {
+        painter->setFont(m_customizedFont);
+    }
     painter->setPen(textColor());
     const TextInfo* textInfo = m_textInfo.value("text");
 
@@ -392,6 +405,17 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
     }
 
     painter->drawStaticText(textInfo->pos, textInfo->staticText);
+
+    /* Exxos/Win7 tile: the capacity bar and the free-space line sit under the
+       name.  Drawn here, after the name, so both land on top of the row
+       background and any selection highlight. */
+    if (m_isTile) {
+        drawCapacityBar(painter);
+        painter->setFont(m_customizedFont);
+        painter->setPen(m_additionalInfoTextColor);
+        painter->drawStaticText(m_capacityFreeTextPos, m_capacityFreeText);
+        painter->setPen(textColor());
+    }
 
     bool clipAdditionalInfoBounds = false;
     if (m_supportsItemExpanding) {
@@ -1162,7 +1186,15 @@ void KStandardItemListWidget::updateTextsCache()
     switch (m_layout) {
     case IconsLayout:   updateIconsLayoutTextCache(); break;
     case CompactLayout: updateCompactLayoutTextCache(); break;
-    case DetailsLayout: updateDetailsLayoutTextCache(); break;
+    case DetailsLayout:
+        /* Exxos/Win7: a row advertising free/total capacity is drawn as an
+           Explorer-style tile instead of a single line. */
+        if (hasCapacityInfo()) {
+            updateTilesLayoutTextCache();
+        } else {
+            updateDetailsLayoutTextCache();
+        }
+        break;
     default: Q_ASSERT(false); break;
     }
 
@@ -1219,6 +1251,7 @@ QString KStandardItemListWidget::elideRightKeepExtension(const QString &text, in
 
 void KStandardItemListWidget::updateIconsLayoutTextCache()
 {
+    m_isTile = false;
     //      +------+
     //      | Icon |
     //      +------+
@@ -1347,6 +1380,7 @@ void KStandardItemListWidget::updateIconsLayoutTextCache()
 
 void KStandardItemListWidget::updateCompactLayoutTextCache()
 {
+    m_isTile = false;
     // +------+  Name role
     // | Icon |  Additional role 1
     // +------+  Additional role 2
@@ -1385,8 +1419,160 @@ void KStandardItemListWidget::updateCompactLayoutTextCache()
     m_textRect = QRectF(x - option.padding, 0, maximumRequiredTextWidth + 2 * option.padding, widgetHeight);
 }
 
+/* ---------------------------------------------------------------------------
+   Exxos/Win7 tile view
+
+   Windows Explorer's Computer view lays each drive out as
+
+       +--------+
+       |        |  Drive name                 <- bold
+       |  icon  |  [=========      ]          <- graphical capacity bar
+       |        |  520 GB free of 931 GB      <- smaller, muted
+       +--------+
+
+   Dolphin has no equivalent view mode: icons view puts text BELOW the icon,
+   details view is a single line, and neither can stack text beside an icon.
+   Rather than add a whole new view mode -- which would mean touching the
+   DolphinView::Mode enum, the view settings, the KCM and the menu actions,
+   and so would break on almost every Dolphin update -- this reuses the
+   existing details layout and switches an INDIVIDUAL ROW to a tile when the
+   model supplies "freeSpace" and "totalSpace".  Rows without those roles are
+   completely unaffected, so ordinary folders look exactly as before.
+   --------------------------------------------------------------------------- */
+
+bool KStandardItemListWidget::hasCapacityInfo() const
+{
+    const QHash<QByteArray, QVariant>& values = data();
+    if (!values.contains("freeSpace") || !values.contains("totalSpace")) {
+        return false;
+    }
+    return values.value("totalSpace").toULongLong() > 0;
+}
+
+void KStandardItemListWidget::updateTilesLayoutTextCache()
+{
+    m_textRect = QRectF();
+    m_isTile = true;
+
+    const KItemListStyleOption& option = styleOption();
+    const QHash<QByteArray, QVariant> values = data();
+
+    m_freeSpace  = values.value("freeSpace").toULongLong();
+    m_totalSpace = values.value("totalSpace").toULongLong();
+
+    const qreal widgetHeight = size().height();
+    const int scaledIconSize = widgetHeight - 2 * option.padding;
+
+    // Text column starts just right of the icon, as in Explorer.
+    const qreal x = scaledIconSize + 2 * option.padding;
+    const qreal availableWidth = size().width() - x - 2 * option.padding;
+
+    QFont boldFont = m_customizedFont;
+    boldFont.setBold(true);
+    const QFontMetrics boldMetrics(boldFont);
+
+    const int nameHeight = boldMetrics.height();
+    const int freeHeight = m_customizedFontMetrics.height();
+    const int barHeight  = qMax(10, freeHeight - 2);
+    const qreal gap      = qMax(qreal(1), qreal(option.padding) / 2);
+
+    const qreal blockHeight = nameHeight + gap + barHeight + gap + freeHeight;
+    qreal y = qMax(qreal(option.padding), (widgetHeight - blockHeight) / 2);
+
+    // --- line 1: the drive name, bold ---
+    TextInfo* nameInfo = m_textInfo.value("text");
+    if (nameInfo) {
+        QString name = roleText("text", values);
+        if (boldMetrics.horizontalAdvance(name) > availableWidth) {
+            name = boldMetrics.elidedText(name, Qt::ElideRight, availableWidth);
+        }
+        nameInfo->staticText.setText(name);
+        nameInfo->pos = QPointF(x, y);
+        m_textRect = QRectF(x - option.padding, 0,
+                            availableWidth + 2 * option.padding, widgetHeight);
+    }
+    y += nameHeight + gap;
+
+    // --- line 2: the capacity bar ---
+    const qreal barWidth = qMin(availableWidth, qreal(220));
+    m_capacityBarRect = QRectF(x, y, barWidth, barHeight);
+    y += barHeight + gap;
+
+    // --- line 3: "<free> free of <total>" ---
+    const QString freeText = i18nc("@info:status free disk space on a device",
+                                   "%1 free of %2",
+                                   KIO::convertSize(m_freeSpace),
+                                   KIO::convertSize(m_totalSpace));
+    m_capacityFreeText.setText(m_customizedFontMetrics.horizontalAdvance(freeText) > availableWidth
+                               ? m_customizedFontMetrics.elidedText(freeText, Qt::ElideRight, availableWidth)
+                               : freeText);
+    m_capacityFreeTextPos = QPointF(x, y);
+
+    /* Every other visible role is pushed off-widget.  In a tile the name, bar
+       and free-space line ARE the content; leaving Size/Modified to paint over
+       the tile would garble it. */
+    for (int i = 1; i < m_sortedVisibleRoles.count(); ++i) {
+        TextInfo* info = m_textInfo.value(m_sortedVisibleRoles[i]);
+        if (info) {
+            info->staticText.setText(QString());
+            info->pos = QPointF(-10000, 0);
+        }
+    }
+}
+
+/* Paints the capacity bar.  The colours are sampled from the Windows 7
+   reference screenshot (computer.PNG) rather than taken from the Qt palette,
+   because the whole point of this view is to reproduce that specific look:
+
+       border      (161,161,161)
+       empty track (251,251,251)
+       fill        (96,217,246) -> (72,193,221) -> (15,136,165)  top to bottom
+
+   Explorer also turns the bar red when a volume is nearly full; that is
+   reproduced at the same 90% threshold Windows uses. */
+void KStandardItemListWidget::drawCapacityBar(QPainter* painter) const
+{
+    if (m_capacityBarRect.isEmpty() || m_totalSpace == 0) {
+        return;
+    }
+
+    const QRectF r = m_capacityBarRect;
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, false);
+
+    // track + border
+    painter->setPen(QColor(161, 161, 161));
+    painter->setBrush(QColor(251, 251, 251));
+    painter->drawRect(r.adjusted(0, 0, -1, -1));
+
+    const qulonglong used = (m_totalSpace > m_freeSpace) ? (m_totalSpace - m_freeSpace) : 0;
+    const qreal ratio = qBound(qreal(0), qreal(used) / qreal(m_totalSpace), qreal(1));
+    const qreal fillWidth = (r.width() - 2) * ratio;
+
+    if (fillWidth > 0) {
+        const QRectF fill(r.left() + 1, r.top() + 1, fillWidth, r.height() - 2);
+        QLinearGradient g(fill.topLeft(), fill.bottomLeft());
+        if (ratio >= 0.9) {                      // nearly full - Explorer goes red
+            g.setColorAt(0.0,  QColor(255, 138, 128));
+            g.setColorAt(0.45, QColor(226,  62,  46));
+            g.setColorAt(0.5,  QColor(180,  20,  10));
+            g.setColorAt(1.0,  QColor(150,  14,   8));
+        } else {
+            g.setColorAt(0.0,  QColor( 96, 217, 246));
+            g.setColorAt(0.45, QColor( 72, 193, 221));
+            g.setColorAt(0.5,  QColor( 15, 136, 165));
+            g.setColorAt(1.0,  QColor(  2, 128, 157));
+        }
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(g);
+        painter->drawRect(fill);
+    }
+    painter->restore();
+}
+
 void KStandardItemListWidget::updateDetailsLayoutTextCache()
 {
+    m_isTile = false;
     // Precondition: Requires already updated m_expansionArea
     // to determine the left position.
 

@@ -207,6 +207,15 @@ private:
     void updateCompactLayoutTextCache();
     void updateDetailsLayoutTextCache();
 
+    /* Exxos/Win7 tile view.
+       Lays a row out as  [icon] | bold name / capacity bar / free-space text,
+       matching Windows Explorer's tile view.  Used INSTEAD of the normal
+       details layout for rows that carry the "freeSpace" and "totalSpace"
+       roles; every other row is unaffected. */
+    void updateTilesLayoutTextCache();
+    bool hasCapacityInfo() const;
+    void drawCapacityBar(QPainter* painter) const;
+
     void updateAdditionalInfoTextColor();
 
     void drawPixmap(QPainter* painter, const QPixmap& pixmap);
@@ -254,6 +263,14 @@ private:
     QSet<QByteArray> m_dirtyContentRoles;
 
     Layout m_layout;
+
+    /* Exxos/Win7 tile view state, valid only while m_isTile is true. */
+    bool m_isTile;
+    qulonglong m_freeSpace;
+    qulonglong m_totalSpace;
+    QRectF m_capacityBarRect;
+    QPointF m_capacityFreeTextPos;
+    QStaticText m_capacityFreeText;
     QPointF m_pixmapPos;
     QPixmap m_pixmap;
     QSize m_scaledPixmapSize; //Size of the pixmap in device independent pixels

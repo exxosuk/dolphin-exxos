@@ -15,6 +15,7 @@
 
 #include <KDirLister>
 #include <KIO/Job>
+#include <KIO/UDSEntry>
 #include <kio_version.h>
 #include <KLocalizedString>
 #include <KUrlMimeData>
@@ -1783,6 +1784,35 @@ QHash<QByteArray, QVariant> KFileItemModel::retrieveData(const KFileItem& item, 
     // and hence will be retrieved asynchronously by KFileItemModelRolesUpdater.
     QHash<QByteArray, QVariant> data;
     data.insert(sharedValue("url"), item.url());
+
+    /* Exxos/Win7 tile view -------------------------------------------------
+       A KIO worker may advertise a device's free and total capacity through
+       the first two UDS_EXTRA fields.  When present these are surfaced as the
+       "freeSpace" / "totalSpace" roles, which KStandardItemListWidget uses to
+       switch that row to a Windows-Explorer-style tile with a real graphical
+       capacity bar (see updateTilesLayoutTextCache / drawCapacityBar).
+
+       Inserted unconditionally rather than behind an m_requestRole[] gate:
+       both values are already in the UDSEntry, so reading them costs nothing,
+       and this avoids having to register two new roles in the role table --
+       which keeps the patch confined to a smaller surface across updates.
+
+       Non-numeric or absent values simply leave the roles unset and every
+       other view renders exactly as before. */
+    {
+        const KIO::UDSEntry &e = item.entry();
+        const QString freeStr  = e.stringValue(KIO::UDSEntry::UDS_EXTRA);
+        const QString totalStr = e.stringValue(KIO::UDSEntry::UDS_EXTRA + 1);
+        if (!freeStr.isEmpty() && !totalStr.isEmpty()) {
+            bool freeOk = false, totalOk = false;
+            const qulonglong freeBytes  = freeStr.toULongLong(&freeOk);
+            const qulonglong totalBytes = totalStr.toULongLong(&totalOk);
+            if (freeOk && totalOk && totalBytes > 0) {
+                data.insert(sharedValue("freeSpace"),  freeBytes);
+                data.insert(sharedValue("totalSpace"), totalBytes);
+            }
+        }
+    }
 
     const bool isDir = item.isDir();
     if (m_requestRole[IsDirRole] && isDir) {
