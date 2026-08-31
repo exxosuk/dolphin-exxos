@@ -1440,6 +1440,20 @@ void KStandardItemListWidget::updateCompactLayoutTextCache()
    completely unaffected, so ordinary folders look exactly as before.
    --------------------------------------------------------------------------- */
 
+/* Windows-style size text: divides by 1024 but labels the result KB/MB/GB/TB,
+   which is exactly what Explorer shows ("910.6 GB free of 1.8 TB").
+   KIO::convertSize() cannot be used here because it produces IEC units
+   ("910.6 GiB"), which would not match the reference. */
+static QString win7Size(qulonglong bytes)
+{
+    static const char* unit[] = { "B", "KB", "MB", "GB", "TB", "PB" };
+    double v = double(bytes);
+    int i = 0;
+    while (v >= 1024.0 && i < 5) { v /= 1024.0; ++i; }
+    return (i == 0) ? QStringLiteral("%1 B").arg(qulonglong(v))
+                    : QStringLiteral("%1 %2").arg(v, 0, 'f', 1).arg(QLatin1String(unit[i]));
+}
+
 bool KStandardItemListWidget::hasCapacityInfo() const
 {
     const QHash<QByteArray, QVariant>& values = data();
@@ -1473,7 +1487,7 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
 
     const int nameHeight = boldMetrics.height();
     const int freeHeight = m_customizedFontMetrics.height();
-    const int barHeight  = qMax(10, freeHeight - 2);
+    const int barHeight  = qMax(9, freeHeight - 4);
     const qreal gap      = qMax(qreal(1), qreal(option.padding) / 2);
 
     const qreal blockHeight = nameHeight + gap + barHeight + gap + freeHeight;
@@ -1501,8 +1515,8 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
     // --- line 3: "<free> free of <total>" ---
     const QString freeText = i18nc("@info:status free disk space on a device",
                                    "%1 free of %2",
-                                   KIO::convertSize(m_freeSpace),
-                                   KIO::convertSize(m_totalSpace));
+                                   win7Size(m_freeSpace),
+                                   win7Size(m_totalSpace));
     m_capacityFreeText.setText(m_customizedFontMetrics.horizontalAdvance(freeText) > availableWidth
                                ? m_customizedFontMetrics.elidedText(freeText, Qt::ElideRight, availableWidth)
                                : freeText);
