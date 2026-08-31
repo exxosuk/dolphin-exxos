@@ -8,6 +8,12 @@
 
 #include "kitemlistwidget.h"
 
+// Exxos: strength of the mouse-over wash. It IS taken from QPalette::Highlight,
+// so hover is a lighter version of whatever the selection colour is -- with a
+// grey selection that gives light grey on hover, darker grey when selected.
+// Painted directly rather than via the style; see the hover branch in paint().
+static const qreal EXXOS_HOVER_ALPHA = 0.55;
+
 #include "kitemlistview.h"
 #include "private/kitemlistselectiontoggle.h"
 
@@ -138,11 +144,47 @@ void KItemListWidget::paint(QPainter* painter, const QStyleOptionGraphicsItem* o
             m_hoverCache->fill(Qt::transparent);
 
             QPainter pixmapPainter(m_hoverCache);
-            const QStyle::State activeState(isActiveWindow() ? QStyle::State_Active : 0);
-            drawItemStyleOption(&pixmapPainter, widget, activeState |
-                                                        QStyle::State_Enabled |
-                                                        QStyle::State_MouseOver |
-                                                        QStyle::State_Item);
+
+            /* Exxos: paint the mouse-over wash directly rather than asking the
+               style for State_MouseOver.
+
+               Two problems with the style route. Styles that DO honour
+               State_MouseOver mostly fill it from QPalette::Highlight, exactly
+               as they fill State_Selected -- so a hovered row came out
+               pixel-identical to a selected one. Styles that do NOT honour it
+               draw nothing at all, so hover vanished entirely. Neither is under
+               the theme's control, and which happens depends on the widget
+               style in use.
+
+               Filling with a semi-transparent Highlight makes it deterministic:
+               the wash composites over whatever is actually beneath, so it is
+               correct on the file view (painted on Base) and on the Places panel
+               (painted on Window) alike, without the widget needing to know
+               which -- and it can never coincide with a full-strength selection.
+
+               EXXOS_HOVER_ALPHA sets the strength; the existing fade animation
+               still runs on top of it. */
+            /* Exxos: hover is a LIGHTER version of the selection colour.
+
+               Both states are drawn from QPalette::Highlight, but hover gets a
+               partial alpha so it composites as a paler wash of the same
+               colour. With the grey selection this reads as light grey on
+               hover, darker grey when selected -- two shades of one colour
+               rather than two different hues.
+
+               Painted here rather than via the style because styles either fill
+               State_MouseOver from Highlight at full strength (identical to
+               selection) or ignore it entirely (nothing drawn at all); neither
+               is under the theme's control. Filling with an alpha composites
+               over whatever is beneath, so it is correct on the file view
+               (Base) and the Places panel (Window) alike. */
+            QColor hoverColor = m_styleOption.palette.color(QPalette::Highlight);
+            hoverColor.setAlphaF(EXXOS_HOVER_ALPHA);
+
+            pixmapPainter.setRenderHint(QPainter::Antialiasing);
+            pixmapPainter.setPen(Qt::NoPen);
+            pixmapPainter.setBrush(hoverColor);
+            pixmapPainter.drawRoundedRect(selectionRect(), 3, 3);
         }
 
         const qreal opacity = painter->opacity();
@@ -264,6 +306,24 @@ void KItemListWidget::setHovered(bool hovered)
     if (hovered) {
         const qreal startValue = qMax(hoverOpacity(), qreal(0.1));
         m_hoverAnimation->setStartValue(startValue);
+        /* Exxos: stop hover short of full opacity so it cannot look identical
+           to a selected row.
+
+           Both states are drawn through the same style primitive, and most Qt
+           styles fill State_MouseOver and State_Selected from
+           QPalette::Highlight alike -- so at 1.0 a hovered row is pixel-for-pixel
+           a selected one. That is confusing when something is already selected
+           and the pointer passes over another entry.
+
+           Capping the opacity is better than substituting a colour: hover
+           becomes a partial wash of the SAME highlight over whatever is
+           actually beneath it, so it stays correct on the file view (painted on
+           Base) and on the Places panel (painted on Window) without the widget
+           having to know which. An earlier attempt blended toward Base and was
+           nearly invisible in the Places panel for exactly that reason.
+
+           0.45 reads clearly as "the pointer is here" while staying obviously
+           weaker than a full selection. */
         m_hoverAnimation->setEndValue(1.0);
         if (m_enabledSelectionToggle && !(QApplication::mouseButtons() & Qt::LeftButton)) {
             initializeSelectionToggle();
@@ -616,46 +676,6 @@ void KItemListWidget::drawItemStyleOption(QPainter* painter, QWidget* widget, QS
     viewItemOption.viewItemPosition = QStyleOptionViewItem::OnlyOne;
     viewItemOption.showDecorationSelected = true;
     viewItemOption.rect = selectionRect().toRect();
-
-    /* Exxos: give MOUSE-OVER its own colour, distinct from selection.
-
-       Most Qt styles fill both State_Selected and State_MouseOver from
-       QPalette::Highlight, so a hovered row and a selected row come out
-       identical -- confusing when, say, Network is selected in the Places
-       panel and the pointer passes over another entry.
-
-       Windows draws hover as a PALER version of the selection colour rather
-       than a different hue, which reads as "you are over this" without
-       competing with "this one is chosen". That is reproduced here by handing
-       the style a palette whose Highlight has been blended toward the
-       background for the hover pass only.
-
-       Done by swapping the palette rather than painting a rectangle directly,
-       so the style still draws its own shape, gradient and rounding -- the
-       widget keeps looking like the rest of the desktop.
-
-       Selection is untouched: this branch only runs for State_MouseOver. */
-    if ((styleState & QStyle::State_MouseOver) && !(styleState & QStyle::State_Selected)) {
-        const QPalette::ColorRole bgRole =
-            (viewItemOption.palette.color(QPalette::Base).alpha() > 0) ? QPalette::Base
-                                                                      : QPalette::Window;
-        const QColor highlight = viewItemOption.palette.color(QPalette::Highlight);
-        const QColor background = viewItemOption.palette.color(bgRole);
-
-        // 32% highlight over the background: clearly visible, clearly weaker
-        // than a full selection.
-        const qreal mix = 0.32;
-        const QColor hover(int(highlight.red()   * mix + background.red()   * (1.0 - mix)),
-                           int(highlight.green() * mix + background.green() * (1.0 - mix)),
-                           int(highlight.blue()  * mix + background.blue()  * (1.0 - mix)));
-
-        QPalette hoverPalette = viewItemOption.palette;
-        hoverPalette.setColor(QPalette::Highlight, hover);
-        // keep the text legible on the paler fill
-        hoverPalette.setColor(QPalette::HighlightedText,
-                              viewItemOption.palette.color(QPalette::Text));
-        viewItemOption.palette = hoverPalette;
-    }
 
     style()->drawPrimitive(QStyle::PE_PanelItemViewItem, &viewItemOption, painter, widget);
 }

@@ -213,6 +213,14 @@ private:
        details layout for rows that carry the "freeSpace" and "totalSpace"
        roles; every other row is unaffected. */
     void updateTilesLayoutTextCache();
+
+    /* Exxos: last step of building the icon pixmap, so a subclass can adjust it.
+       Default does nothing, so every view is unchanged; PlacesItemListWidget
+       overrides it to darken device icons that would otherwise be invisible
+       against the panel. Called only when the pixmap is rebuilt, not per paint. */
+protected:
+    virtual void applyIconEffect(QPixmap& pixmap) const;
+private:
     bool hasCapacityInfo() const;
     void drawCapacityBar(QPainter* painter) const;
 

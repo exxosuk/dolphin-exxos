@@ -1088,6 +1088,9 @@ void KStandardItemListWidget::updatePixmapCache()
             KIconEffect::colorize(image, color, 0.8f);
             m_pixmap = QPixmap::fromImage(image);
         }
+
+        // Exxos: let a subclass have the last word on the icon.
+        applyIconEffect(m_pixmap);
     }
 
     if (!m_overlay.isNull()) {
@@ -1613,6 +1616,12 @@ void KStandardItemListWidget::drawCapacityBar(QPainter* painter) const
         painter->drawRect(fill);
     }
     painter->restore();
+}
+
+/* Exxos: no-op by default -- see the declaration. */
+void KStandardItemListWidget::applyIconEffect(QPixmap& pixmap) const
+{
+    Q_UNUSED(pixmap)
 }
 
 void KStandardItemListWidget::updateDetailsLayoutTextCache()
