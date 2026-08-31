@@ -616,6 +616,47 @@ void KItemListWidget::drawItemStyleOption(QPainter* painter, QWidget* widget, QS
     viewItemOption.viewItemPosition = QStyleOptionViewItem::OnlyOne;
     viewItemOption.showDecorationSelected = true;
     viewItemOption.rect = selectionRect().toRect();
+
+    /* Exxos: give MOUSE-OVER its own colour, distinct from selection.
+
+       Most Qt styles fill both State_Selected and State_MouseOver from
+       QPalette::Highlight, so a hovered row and a selected row come out
+       identical -- confusing when, say, Network is selected in the Places
+       panel and the pointer passes over another entry.
+
+       Windows draws hover as a PALER version of the selection colour rather
+       than a different hue, which reads as "you are over this" without
+       competing with "this one is chosen". That is reproduced here by handing
+       the style a palette whose Highlight has been blended toward the
+       background for the hover pass only.
+
+       Done by swapping the palette rather than painting a rectangle directly,
+       so the style still draws its own shape, gradient and rounding -- the
+       widget keeps looking like the rest of the desktop.
+
+       Selection is untouched: this branch only runs for State_MouseOver. */
+    if ((styleState & QStyle::State_MouseOver) && !(styleState & QStyle::State_Selected)) {
+        const QPalette::ColorRole bgRole =
+            (viewItemOption.palette.color(QPalette::Base).alpha() > 0) ? QPalette::Base
+                                                                      : QPalette::Window;
+        const QColor highlight = viewItemOption.palette.color(QPalette::Highlight);
+        const QColor background = viewItemOption.palette.color(bgRole);
+
+        // 32% highlight over the background: clearly visible, clearly weaker
+        // than a full selection.
+        const qreal mix = 0.32;
+        const QColor hover(int(highlight.red()   * mix + background.red()   * (1.0 - mix)),
+                           int(highlight.green() * mix + background.green() * (1.0 - mix)),
+                           int(highlight.blue()  * mix + background.blue()  * (1.0 - mix)));
+
+        QPalette hoverPalette = viewItemOption.palette;
+        hoverPalette.setColor(QPalette::Highlight, hover);
+        // keep the text legible on the paler fill
+        hoverPalette.setColor(QPalette::HighlightedText,
+                              viewItemOption.palette.color(QPalette::Text));
+        viewItemOption.palette = hoverPalette;
+    }
+
     style()->drawPrimitive(QStyle::PE_PanelItemViewItem, &viewItemOption, painter, widget);
 }
 
