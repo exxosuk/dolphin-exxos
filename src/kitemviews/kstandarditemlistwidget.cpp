@@ -1686,7 +1686,11 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
         // two, which is what Explorer shows and what the tile already has room
         // for.
         m_capacityBarRect = QRectF();
-        const QString whole = nameInfo ? nameInfo->staticText.text() : QString();
+        /* Split the ORIGINAL role text, not nameInfo->staticText, which the
+           block above has already elided to fit one line -- splitting that
+           gave "CD-RW/DVD+-RW DL Drive" plus a tail of "n...", the remains of
+           "not mounted" after the ellipsis had eaten it. */
+        const QString whole = roleText("text", values);
         const int dash = whole.indexOf(QStringLiteral(" — "));
         if (nameInfo && dash > 0) {
             QString head = whole.left(dash);
