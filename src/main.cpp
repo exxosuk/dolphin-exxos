@@ -257,11 +257,28 @@ int main(int argc, char **argv)
         QObject::connect(&app, &QGuiApplication::commitDataRequest, disableSessionManagement);
         QObject::connect(&app, &QGuiApplication::saveStateRequest, disableSessionManagement);
 
+        /* Exxos Edition: register under our OWN D-Bus name.
+
+           KDBusService takes the name from QCoreApplication::applicationName(),
+           which KAboutData set to "dolphin" -- the same name stock Dolphin
+           uses. Single-instance then means whichever started FIRST serves every
+           later request: open a folder from another application, that starts
+           /usr/bin/dolphin, and from then on launching dolphin-exxos silently
+           handed the window to the stock process. The patched build appeared to
+           do nothing at all, which is a very confusing way for it to fail.
+
+           The name is changed only around the KDBusService constructor and put
+           straight back, so every config file (dolphinrc, view properties,
+           window state) is still read and written as "dolphin" and nothing is
+           lost or duplicated. */
+        const QString realAppName = QCoreApplication::applicationName();
+        QCoreApplication::setApplicationName(QStringLiteral("dolphin-exxos"));
 #ifdef FLATPAK
         KDBusService dolphinDBusService(KDBusService::NoExitOnFailure);
 #else
         KDBusService dolphinDBusService;
 #endif
+        QCoreApplication::setApplicationName(realAppName);
         DBusInterface interface;
         interface.setAsDaemon();
         return app.exec();
