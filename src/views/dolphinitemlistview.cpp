@@ -260,10 +260,15 @@ void DolphinItemListView::updateGridSize()
            inspects the model, so ordinary folders keep the normal icon grid. */
         tileLayout = viewHasCapacityItems();
         if (tileLayout) {
-            /* 48px floor, same reason as the details layout: below that the
-               name, the capacity bar and the free-space line have less room
-               than they need and start colliding with each other. */
-            effectiveIconSize = qMax(iconSize, 48);
+            /* 32px floor -- the zoom slider's own minimum.
+
+               This was 48 when the row height still followed the ICON size, so
+               a smaller icon meant a shorter row and the three stacked lines
+               collided. The height is now max(icon, textBlock), so the text
+               always has its own room and the icon is free to be smaller. That
+               makes the 32 and 48 stops visibly different again, which they
+               were not while both were clamped to 48. */
+            effectiveIconSize = qMax(iconSize, 32);
             /* The cell has to grow with the zoom too, or the icon gets bigger
                while the bar and the text stay the size they were and the tile
                stops looking like one thing. Same scale the widget uses for the
@@ -313,7 +318,7 @@ void DolphinItemListView::updateGridSize()
            and can still be made as small as the user likes. */
         tileLayout = viewHasCapacityItems();
         if (tileLayout) {
-            effectiveIconSize = qMax(iconSize, 48);
+            effectiveIconSize = qMax(iconSize, 32);   // see the icons branch
             const qreal tileScale = KStandardItemListWidget::exxosTileScale(effectiveIconSize);
             const int textBlock = qRound(3 * option.fontMetrics.lineSpacing() * tileScale);
             itemHeight = padding * 2 + qMax(effectiveIconSize, textBlock);

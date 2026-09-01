@@ -124,7 +124,15 @@ void KItemListWidget::paint(QPainter* painter, const QStyleOptionGraphicsItem* o
                                              QStyle::State_Item);
     }
 
-    if (m_current && m_editedRole.isEmpty()) {
+    /* Exxos/Win7: no dotted focus rectangle.
+
+       Explorer does not draw one -- the current item is shown by its selection
+       wash alone -- and on a capacity tile the dotted outline lands around the
+       whole tile, which reads as a second, competing selection and is simply
+       noise. Selection and hover are already distinct here (grey, and a
+       lighter grey), so nothing is lost by dropping it. */
+    static const bool EXXOS_DRAW_FOCUS_RECT = false;
+    if (EXXOS_DRAW_FOCUS_RECT && m_current && m_editedRole.isEmpty()) {
         QStyleOptionFocusRect focusRectOption;
         initStyleOption(&focusRectOption);
         focusRectOption.rect = textFocusRect().toRect();
