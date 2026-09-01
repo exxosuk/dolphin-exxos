@@ -1139,8 +1139,23 @@ void KStandardItemListWidget::updatePixmapCache()
     } else {
         const int textRowsCount = (m_layout == CompactLayout) ? visibleRoles().count() : 1;
         const qreal requiredTextHeight = textRowsCount * m_customizedFontMetrics.height();
-        scaledIconSize = (requiredTextHeight < maxIconHeight) ?
-                           widgetSize.height() - 2 * padding : maxIconHeight;
+        if (m_isTile) {
+            /* Exxos/Win7: a tile sizes its icon from the ZOOM, not from the
+               widget height.
+
+               The rule below scales the icon to fill the row height whenever
+               the text is shorter than the icon box. On an ordinary details
+               row that is what you want. On a tile the height is
+               max(iconSize, three lines of text), so the icon ended up
+               tracking whichever of those won rather than the icon size --
+               and between two zoom steps where the text block stayed the
+               taller of the two, the icon did not visibly grow at all even
+               though everything else did. */
+            scaledIconSize = maxIconHeight;
+        } else {
+            scaledIconSize = (requiredTextHeight < maxIconHeight) ?
+                               widgetSize.height() - 2 * padding : maxIconHeight;
+        }
     }
 
     const int maxScaledIconWidth = iconOnTop ? widgetSize.width() - 2 * padding : scaledIconSize;
