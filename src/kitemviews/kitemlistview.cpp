@@ -2587,17 +2587,7 @@ void KItemListView::updateGroupHeaderHeight()
        size (see KStandardItemListGroupHeader::exxosHeaderFont), so the height
        reserved for them has to follow the same scale or the heading is clipped
        along its top edge. Kept in step with that function deliberately. */
-    QFont headerFont = m_styleOption.font;
-    {
-        const qreal base = 48.0;
-        const qreal iconSize = qMax(1, m_styleOption.iconSize);
-        const qreal factor = qBound(1.0, 1.0 + (iconSize - base) / base * 0.5, 2.0);
-        if (headerFont.pointSizeF() > 0) {
-            headerFont.setPointSizeF(headerFont.pointSizeF() * factor);
-        } else if (headerFont.pixelSize() > 0) {
-            headerFont.setPixelSize(qRound(headerFont.pixelSize() * factor));
-        }
-    }
+    const QFont headerFont = KItemListGroupHeader::exxosScaledHeaderFont(m_styleOption);
     qreal groupHeaderHeight = QFontMetricsF(headerFont).height();
     qreal groupHeaderMargin = 0;
 

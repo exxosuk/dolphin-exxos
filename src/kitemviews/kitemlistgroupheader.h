@@ -53,6 +53,15 @@ public:
 
     void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
+public:
+    /* Exxos/Win7: the group headings scale with the icon size, the way
+       Explorer does. Defined here so that everything which needs the heading
+       font agrees on it: the widget that draws it, the bounds it is drawn
+       into (KItemListGroupHeader::updateSize) and the height the layouter
+       reserves for it (KItemListView::updateGroupHeaderHeight). They got out
+       of step once already and the heading was clipped along its top edge. */
+    static QFont exxosScaledHeaderFont(const KItemListStyleOption& option);
+
 protected:
     virtual void paintRole(QPainter* painter, const QRectF& roleBounds, const QColor& color) = 0;
     virtual void paintSeparator(QPainter* painter, const QColor& color) = 0;

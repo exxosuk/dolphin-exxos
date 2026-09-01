@@ -180,12 +180,31 @@ void KItemListGroupHeader::updateCache()
     m_dirtyCache = false;
 }
 
+QFont KItemListGroupHeader::exxosScaledHeaderFont(const KItemListStyleOption& option)
+{
+    QFont headerFont = option.font;
+    /* 48px is the tile floor and the size these headings were tuned at, so it
+       is the 1.0 point. Growth is deliberately gentler than the icons' -- a
+       heading scaled linearly against a 256px icon is absurd -- and it never
+       shrinks below the base font. */
+    const qreal base = 48.0;
+    const qreal iconSize = qMax(1, option.iconSize);
+    const qreal factor = qBound(1.0, 1.0 + (iconSize - base) / base * 0.5, 2.0);
+    if (headerFont.pointSizeF() > 0) {
+        headerFont.setPointSizeF(headerFont.pointSizeF() * factor);
+    } else if (headerFont.pixelSize() > 0) {
+        headerFont.setPixelSize(qRound(headerFont.pixelSize() * factor));
+    }
+    return headerFont;
+}
+
 void KItemListGroupHeader::updateSize()
 {
     const int padding = qMax(1, m_styleOption.padding);
     const int horizontalMargin = qMax(2, m_styleOption.horizontalMargin);
 
-    const QFontMetrics fontMetrics(m_styleOption.font);
+    // Must match the font paintRole() actually draws with, or the text clips.
+    const QFontMetrics fontMetrics(exxosScaledHeaderFont(m_styleOption));
     const qreal roleHeight = fontMetrics.height();
 
     const int y = (m_scrollOrientation == Qt::Vertical) ? padding : horizontalMargin;

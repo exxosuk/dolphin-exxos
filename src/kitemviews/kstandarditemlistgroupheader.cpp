@@ -89,16 +89,7 @@ void KStandardItemListGroupHeader::resizeEvent(QGraphicsSceneResizeEvent* event)
    below the base font. */
 QFont KStandardItemListGroupHeader::exxosHeaderFont() const
 {
-    QFont headerFont = styleOption().font;
-    const qreal base = 48.0;
-    const qreal iconSize = qMax(1, styleOption().iconSize);
-    const qreal factor = qBound(1.0, 1.0 + (iconSize - base) / base * 0.5, 2.0);
-    if (headerFont.pointSizeF() > 0) {
-        headerFont.setPointSizeF(headerFont.pointSizeF() * factor);
-    } else if (headerFont.pixelSize() > 0) {
-        headerFont.setPixelSize(qRound(headerFont.pixelSize() * factor));
-    }
-    return headerFont;
+    return exxosScaledHeaderFont(styleOption());
 }
 
 void KStandardItemListGroupHeader::updateCache()
