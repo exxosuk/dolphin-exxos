@@ -110,6 +110,35 @@ public:
                              selected ? EXXOS_CAPACITY_SELECTED : EXXOS_CAPACITY_USED);
 
         m_inner->paint(painter, opt, index);
+
+        /* Exxos/Win7: repaint the section header ("Places", "Remote", "Recent",
+           "Search For", "Devices") in full-strength text.
+
+           KIO draws it as mixedColor(WindowText, Window, 60) -- 60% text, 40%
+           background -- which on this desktop is a light grey on a barely
+           darker grey and is close to unreadable. The colour is computed inside
+           its private drawSectionHeader(), so the only way at it is to paint
+           over: fill the header strip back to the panel background, then draw
+           the same string at full weight. Geometry is KIO's own, recomputed
+           above, so the text lands exactly where it was. */
+        if (indexIsSectionHeader(index)) {
+            const QString label = index.data(KFilePlacesModel::GroupRole).toString();
+            if (!label.isEmpty()) {
+                QRect headerRect(option.rect);
+                headerRect.setHeight(sectionHeaderHeight(index));
+
+                QRect textRect(headerRect);
+                textRect.setLeft(textRect.left() + 3);
+                textRect.setHeight(sectionHeaderHeight(index) - s_lateralMargin - m_view->spacing());
+
+                painter->save();
+                painter->fillRect(headerRect, option.palette.color(QPalette::Window));
+                painter->setPen(option.palette.color(QPalette::WindowText));
+                painter->drawText(textRect, Qt::AlignLeft | Qt::AlignBottom,
+                                  option.fontMetrics.elidedText(label, Qt::ElideRight, textRect.width()));
+                painter->restore();
+            }
+        }
     }
 
 private:
