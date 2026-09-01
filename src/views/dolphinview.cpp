@@ -189,17 +189,9 @@ DolphinView::DolphinView(const QUrl& url, QWidget* parent) :
        anywhere else. A disc appearing or going away is exactly a Solid device
        add/remove. */
     connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceAdded,
-            this, [this](const QString &) {
-                if (this->url().scheme() == QLatin1String("computer")) {
-                    reload();
-                }
-            });
+            this, [this](const QString &) { scheduleComputerReload(); });
     connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceRemoved,
-            this, [this](const QString &) {
-                if (this->url().scheme() == QLatin1String("computer")) {
-                    reload();
-                }
-            });
+            this, [this](const QString &) { scheduleComputerReload(); });
 
     connect(m_model, &KFileItemModel::directoryLoadingStarted,       this, &DolphinView::slotDirectoryLoadingStarted);
     connect(m_model, &KFileItemModel::directoryLoadingCompleted,     this, &DolphinView::slotDirectoryLoadingCompleted);
@@ -543,6 +535,35 @@ void DolphinView::setVisibleRoles(const QList<QByteArray>& roles)
 QList<QByteArray> DolphinView::visibleRoles() const
 {
     return m_visibleRoles;
+}
+
+/* Reload computer:/ a moment after the hardware settles.
+
+   Solid's deviceAdded fires when the block device appears, which is BEFORE
+   udisks has finished probing the medium -- at that instant there is still no
+   volume and no label, so reloading immediately re-read the old answer ("No
+   disc") and nothing ever reloaded again. Inserting a disc showed GAMES3 in
+   the Places panel, which listens to Solid directly, while the icon view sat
+   unchanged until Dolphin was restarted.
+
+   A single-shot timer, restarted on every event, both waits for the probe and
+   collapses the burst of signals one insertion produces into one reload. */
+void DolphinView::scheduleComputerReload()
+{
+    if (url().scheme() != QLatin1String("computer")) {
+        return;
+    }
+    if (!m_computerReloadTimer) {
+        m_computerReloadTimer = new QTimer(this);
+        m_computerReloadTimer->setSingleShot(true);
+        m_computerReloadTimer->setInterval(1200);
+        connect(m_computerReloadTimer, &QTimer::timeout, this, [this]() {
+            if (url().scheme() == QLatin1String("computer")) {
+                reload();
+            }
+        });
+    }
+    m_computerReloadTimer->start();
 }
 
 void DolphinView::reload()

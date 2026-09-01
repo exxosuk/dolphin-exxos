@@ -226,6 +226,10 @@ public:
     /** Returns the additional information which should be shown for the items. */
     QList<QByteArray> visibleRoles() const;
 
+    /* Exxos/Win7: reload computer:/ shortly after a Solid device event,
+       once udisks has finished probing the medium. */
+    void scheduleComputerReload();
+
     void reload();
 
     /**
@@ -947,6 +951,8 @@ private:
     friend class DolphinDetailsViewTest;
     friend class DolphinMainWindowTest;
     friend class DolphinPart;                   // Accesses m_model
+
+    QTimer* m_computerReloadTimer = nullptr;   // Exxos/Win7
 };
 
 /// Allow using DolphinView::Mode in QVariant
