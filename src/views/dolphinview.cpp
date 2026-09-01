@@ -6,6 +6,9 @@
  */
 
 #include <Solid/DeviceNotifier>
+#include <Solid/StorageAccess>
+#include <Solid/DeviceInterface>
+#include <Solid/Device>
 #include "dolphinview.h"
 
 #include "dolphin_generalsettings.h"
@@ -189,9 +192,13 @@ DolphinView::DolphinView(const QUrl& url, QWidget* parent) :
        anywhere else. A disc appearing or going away is exactly a Solid device
        add/remove. */
     connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceAdded,
-            this, [this](const QString &) { scheduleComputerReload(); });
+            this, [this](const QString &udi) {
+                exxosWatchAccessibility(udi);   // a new volume can be mounted later
+                scheduleComputerReload();
+            });
     connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceRemoved,
             this, [this](const QString &) { scheduleComputerReload(); });
+    exxosWatchAccessibility(QString());   // and everything already present
 
     connect(m_model, &KFileItemModel::directoryLoadingStarted,       this, &DolphinView::slotDirectoryLoadingStarted);
     connect(m_model, &KFileItemModel::directoryLoadingCompleted,     this, &DolphinView::slotDirectoryLoadingCompleted);
@@ -548,6 +555,35 @@ QList<QByteArray> DolphinView::visibleRoles() const
 
    A single-shot timer, restarted on every event, both waits for the probe and
    collapses the burst of signals one insertion produces into one reload. */
+/* Watch for volumes being mounted or unmounted.
+
+   deviceAdded is NOT enough. Inserting a disc adds the block device, and the
+   MOUNT happens seconds later -- auto-mount, or the user clicking it -- and
+   that emits StorageAccess::accessibilityChanged, not a device signal. Without
+   this the view still read "GAMES3 - not mounted" long after it had actually
+   been mounted at /media/chris/GAMES3.
+
+   Passing an empty udi connects everything currently present; passing one
+   connects just that device, for volumes that appear later.
+
+   Qt::UniqueConnection keeps repeat calls from stacking duplicate handlers. */
+void DolphinView::exxosWatchAccessibility(const QString &udi)
+{
+    const auto devices = udi.isEmpty()
+        ? Solid::Device::listFromType(Solid::DeviceInterface::StorageAccess, QString())
+        : QList<Solid::Device>{ Solid::Device(udi) };
+
+    for (const Solid::Device &dev : devices) {
+        auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>());
+        if (!access) {
+            continue;
+        }
+        connect(access, &Solid::StorageAccess::accessibilityChanged,
+                this, [this](bool, const QString &) { scheduleComputerReload(); },
+                Qt::UniqueConnection);
+    }
+}
+
 void DolphinView::scheduleComputerReload()
 {
     if (url().scheme() != QLatin1String("computer")) {

@@ -228,6 +228,7 @@ public:
 
     /* Exxos/Win7: reload computer:/ shortly after a Solid device event,
        once udisks has finished probing the medium. */
+    void exxosWatchAccessibility(const QString &udi);
     void scheduleComputerReload();
 
     void reload();
