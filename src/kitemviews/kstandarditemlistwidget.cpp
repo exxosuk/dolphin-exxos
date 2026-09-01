@@ -1560,16 +1560,23 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
     const qreal widgetHeight = size().height();
     /* In details layout the row height defines the icon box; in icons layout
        the cell is taller than the icon, so the configured icon size is used. */
-    /* Use iconSize(), NOT option.iconSize.
-       They are different values: iconSize() is the widget's own m_iconSize,
-       and it is what updatePixmapCache() scales the pixmap to fit. Reserving
-       the box with option.iconSize instead meant that whenever the two
-       disagreed the pixmap came out wider than the box it was centred in, so
-       m_pixmapPos.x went NEGATIVE and the icon was clipped at the widget's
-       left edge -- the missing left-hand side of the icon. */
+    /* Reserve the LARGER of iconSize() and option.iconSize.
+
+       They are two different values: iconSize() is the widget's own
+       m_iconSize, which is what updatePixmapCache() scales the pixmap to fit;
+       option.iconSize is the view's. This box has to satisfy both, because it
+       does two jobs at once -- the pixmap is centred in it, and the text
+       column starts just after it:
+
+         too small for the pixmap -> m_pixmapPos.x goes negative and the icon
+                                     is clipped at the widget's left edge
+         too small for the text   -> the text column starts over the icon
+
+       Taking whichever is bigger is the only value that avoids both. */
     const int scaledIconSize = (m_layout == IconsLayout)
-                             ? iconSize()
-                             : qMax(iconSize(), int(widgetHeight - 2 * option.padding));
+                             ? qMax(iconSize(), option.iconSize)
+                             : qMax(qMax(iconSize(), option.iconSize),
+                                    int(widgetHeight - 2 * option.padding));
 
     // Text column starts just right of the icon, as in Explorer.
     const qreal x = scaledIconSize + 2 * option.padding;
