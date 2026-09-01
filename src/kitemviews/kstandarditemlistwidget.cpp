@@ -1675,9 +1675,45 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
                             availableWidth + 2 * option.padding, widgetHeight);
     }
     if (!hasCap) {
-        // no bar, no free-space line
+        // no bar -- but if the name carries a status after an em dash, put that
+        // on the second line rather than eliding one long line.
+        //
+        // The computer:/ worker sends a single string per item, e.g.
+        //     "HL-DT-ST DVDRAM GH24NSD1 — No disc"
+        //     "Floppy Disk — not mounted"
+        // which is far too long for a tile and was simply cut off. Splitting at
+        // the dash gives the drive its name on line one and its state on line
+        // two, which is what Explorer shows and what the tile already has room
+        // for.
         m_capacityBarRect = QRectF();
-        m_capacityFreeText.setText(QString());
+        const QString whole = nameInfo ? nameInfo->staticText.text() : QString();
+        const int dash = whole.indexOf(QStringLiteral(" — "));
+        if (nameInfo && dash > 0) {
+            QString head = whole.left(dash);
+            QString tail = whole.mid(dash + 3);
+            /* Only elide against a width we actually believe. This cache can
+               be built before the widget has been given its real size, and
+               eliding against a near-zero width burns the string down to one
+               character plus an ellipsis -- "n..." where "not mounted" should
+               be. It is rebuilt once the size is known, so leaving the text
+               whole for that one pass costs nothing. */
+            const bool widthIsUsable = availableWidth > 40;
+            if (widthIsUsable && boldMetrics.horizontalAdvance(head) > availableWidth) {
+                head = boldMetrics.elidedText(head, Qt::ElideRight, availableWidth);
+            }
+            if (widthIsUsable && tileMetrics.horizontalAdvance(tail) > availableWidth) {
+                tail = tileMetrics.elidedText(tail, Qt::ElideRight, availableWidth);
+            }
+            nameInfo->staticText.setText(head);
+            // re-centre the two lines together
+            const qreal twoLines = nameHeight + gap + freeHeight;
+            const qreal top = qMax(qreal(option.padding), (widgetHeight - twoLines) / 2);
+            nameInfo->pos = QPointF(x, top);
+            m_capacityFreeText.setText(tail);
+            m_capacityFreeTextPos = QPointF(x, top + nameHeight + gap);
+        } else {
+            m_capacityFreeText.setText(QString());
+        }
     } else {
         y += nameHeight + gap;
 
