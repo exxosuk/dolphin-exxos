@@ -256,7 +256,16 @@ void KStandardItemListWidgetInformant::calculateCompactLayoutItemSizeHints(QVect
 void KStandardItemListWidgetInformant::calculateDetailsLayoutItemSizeHints(QVector<std::pair<qreal, bool>>& logicalHeightHints, qreal& logicalWidthHint, const KItemListView* view) const
 {
     const KItemListStyleOption& option = view->styleOption();
-    const qreal height = option.padding * 2 + qMax(option.iconSize, option.fontMetrics.height());
+    /* Exxos/Win7: same as the icons layout -- a capacity row is a TILE, with
+       name, capacity bar and free-space line stacked beside the icon, so it
+       needs the full row height updateGridSize() worked out. The one-line
+       height below would leave the widget shorter than its own cell, and the
+       tile would paint outside its bounds: the view only invalidates the rect
+       a widget claims, so the overspill is never cleared and zooming leaves
+       fragments of the previous icons behind. */
+    const qreal height = option.tileLayout
+                       ? view->itemSize().height()
+                       : option.padding * 2 + qMax(option.iconSize, option.fontMetrics.height());
     logicalHeightHints.fill(std::make_pair(height, false));
     logicalWidthHint = -1.0;
 }
