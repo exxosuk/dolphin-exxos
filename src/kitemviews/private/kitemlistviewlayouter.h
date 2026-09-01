@@ -53,6 +53,14 @@ public:
      * Margin between the rows and columns of items.
      */
     void setItemMargin(const QSizeF& margin);
+
+    /* Exxos/Win7: when false, unused horizontal width is NOT given a share in
+       front of the first column, so the grid stays flush against the left
+       margin and any slack falls on the right. The capacity-tile grid uses
+       very wide cells, so the leading share was large and the drives visibly
+       drifted right as the zoom went up. */
+    void setDistributeLeadingSpace(bool enabled);
+    bool distributeLeadingSpace() const;
     QSizeF itemMargin() const;
 
     /**
@@ -194,6 +202,7 @@ private:
     qreal m_scrollOffset;
     qreal m_maximumScrollOffset;
 
+    bool m_distributeLeadingSpace = true;   // Exxos/Win7
     qreal m_itemOffset;
     qreal m_maximumItemOffset;
 

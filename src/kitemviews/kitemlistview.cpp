@@ -844,6 +844,9 @@ void KItemListView::setStyleOption(const KItemListStyleOption& option)
         animate = false;
     }
 
+    // Exxos/Win7: a tile grid stays flush left; see setDistributeLeadingSpace().
+    m_layouter->setDistributeLeadingSpace(!option.tileLayout);
+
     QHashIterator<int, KItemListWidget*> it(m_visibleItems);
     while (it.hasNext()) {
         it.next();

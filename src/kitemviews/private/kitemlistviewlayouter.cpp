@@ -174,6 +174,19 @@ void KItemListViewLayouter::setItemOffset(qreal offset)
     }
 }
 
+void KItemListViewLayouter::setDistributeLeadingSpace(bool enabled)
+{
+    if (m_distributeLeadingSpace != enabled) {
+        m_distributeLeadingSpace = enabled;
+        m_dirty = true;
+    }
+}
+
+bool KItemListViewLayouter::distributeLeadingSpace() const
+{
+    return m_distributeLeadingSpace;
+}
+
 qreal KItemListViewLayouter::itemOffset() const
 {
     return m_itemOffset;
@@ -391,9 +404,16 @@ void KItemListViewLayouter::doLayout()
         // Apply the unused width equally to each column
         const qreal unusedWidth = widthForColumns - m_columnCount * m_columnWidth;
         if (unusedWidth > 0) {
-            const qreal columnInc = unusedWidth / (m_columnCount + 1);
-            m_columnWidth += columnInc;
-            m_xPosInc += columnInc;
+            if (m_distributeLeadingSpace) {
+                const qreal columnInc = unusedWidth / (m_columnCount + 1);
+                m_columnWidth += columnInc;
+                m_xPosInc += columnInc;
+            } else if (m_columnCount > 1) {
+                /* Exxos/Win7: share the slack BETWEEN the columns only, never
+                   in front of the first one, so the grid stays flush left. */
+                const qreal columnInc = unusedWidth / m_columnCount;
+                m_columnWidth += columnInc;
+            }
         }
     }
 
