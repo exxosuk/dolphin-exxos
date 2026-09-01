@@ -74,9 +74,8 @@ private:
        which switches the icons grid to wide Explorer-style tiles. */
     bool viewHasCapacityItems() const;
 
-    ViewModeSettings::ViewMode viewMode() const;
 
-private slots:
+private Q_SLOTS:
     void slotCapacityItemsMayHaveChanged();
 
 private:
