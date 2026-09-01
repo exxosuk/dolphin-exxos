@@ -8,6 +8,9 @@
 
 #include "kitemviews/kitemmodelbase.h"   // Exxos/Win7 tile grid: model signals
 
+#include <QGraphicsScene>
+#include <QGraphicsView>
+
 #include "dolphin_compactmodesettings.h"
 #include "dolphin_detailsmodesettings.h"
 #include "dolphin_generalsettings.h"
@@ -257,10 +260,14 @@ void DolphinItemListView::updateGridSize()
            inspects the model, so ordinary folders keep the normal icon grid. */
         tileLayout = viewHasCapacityItems();
         if (tileLayout) {
+            /* 48px floor, same reason as the details layout: below that the
+               name, the capacity bar and the free-space line have less room
+               than they need and start colliding with each other. */
+            effectiveIconSize = qMax(iconSize, 48);
             const int barWidth  = 220;
             const int textBlock = 3 * option.fontMetrics.lineSpacing();
-            itemWidth  = padding * 4 + iconSize + barWidth;
-            itemHeight = padding * 3 + qMax(iconSize, textBlock);
+            itemWidth  = padding * 4 + effectiveIconSize + barWidth;
+            itemHeight = padding * 3 + qMax(effectiveIconSize, textBlock);
             horizontalMargin = 8;
             verticalMargin = 4;
             maxTextLines = 1;
@@ -325,4 +332,23 @@ void DolphinItemListView::updateGridSize()
     setStyleOption(option);
     setItemSize(QSizeF(itemWidth, itemHeight));
     endTransaction();
+
+    /* Exxos/Win7: repaint the container's viewport after a grid change.
+
+       A tile cell is much wider than a normal icon cell, so a zoom step moves
+       the columns sideways by a large amount, and the strip they vacate is
+       plain view background -- not inside any widget's rect. The view only
+       invalidates the rects its widgets claim, so nothing ever repaints that
+       strip and it keeps the left edges of the icons that used to be there.
+
+       This is a QGraphicsWidget, so update() only schedules its own rect
+       within the scene; the stale pixels are in the container's viewport, so
+       that is what has to be told to repaint. Runs on zoom and layout changes
+       only. */
+    if (QGraphicsScene *graphicsScene = scene()) {
+        const auto views = graphicsScene->views();
+        for (QGraphicsView *view : views) {
+            view->viewport()->update();
+        }
+    }
 }

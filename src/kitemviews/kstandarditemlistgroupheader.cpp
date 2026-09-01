@@ -36,6 +36,7 @@ void KStandardItemListGroupHeader::paintRole(QPainter* painter, const QRectF& ro
 {
     if (m_pixmap.isNull()) {
         painter->setPen(color);
+        painter->setFont(exxosHeaderFont());
         painter->drawText(roleBounds, 0, m_text);
     } else {
         painter->drawPixmap(roleBounds.topLeft(), m_pixmap);
@@ -82,6 +83,24 @@ void KStandardItemListGroupHeader::resizeEvent(QGraphicsSceneResizeEvent* event)
     m_dirtyCache = true;
 }
 
+/* 48px is the tile floor and the size the headings were tuned at, so that is
+   the 1.0 point. Growth is deliberately gentler than the icons' -- headings
+   that scale linearly with a 256px icon end up absurd -- and it never shrinks
+   below the base font. */
+QFont KStandardItemListGroupHeader::exxosHeaderFont() const
+{
+    QFont headerFont = styleOption().font;
+    const qreal base = 48.0;
+    const qreal iconSize = qMax(1, styleOption().iconSize);
+    const qreal factor = qBound(1.0, 1.0 + (iconSize - base) / base * 0.5, 2.0);
+    if (headerFont.pointSizeF() > 0) {
+        headerFont.setPointSizeF(headerFont.pointSizeF() * factor);
+    } else if (headerFont.pixelSize() > 0) {
+        headerFont.setPixelSize(qRound(headerFont.pixelSize() * factor));
+    }
+    return headerFont;
+}
+
 void KStandardItemListGroupHeader::updateCache()
 {
     Q_ASSERT(m_dirtyCache);
@@ -105,7 +124,7 @@ void KStandardItemListGroupHeader::updateCache()
     } else {
         m_pixmap = QPixmap();
 
-        QFontMetricsF fontMetrics(font());
+        QFontMetricsF fontMetrics(exxosHeaderFont());
         const QString text = fontMetrics.elidedText(data().toString(), Qt::ElideRight, maxWidth);
         m_text = text;
     }

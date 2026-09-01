@@ -23,6 +23,13 @@ public:
     void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
 protected:
+    /* Exxos/Win7: the group headings ("Hard Disk Drives", "Devices with
+       Removable Storage", "Network Locations") are drawn with the widget's
+       plain font, so they stayed the same size while the icons zoomed.
+       Scale them with the icon size the way Explorer does. */
+    QFont exxosHeaderFont() const;
+
+
     void paintRole(QPainter* painter, const QRectF& roleBounds, const QColor& color) override;
     void paintSeparator(QPainter* painter, const QColor& color) override;
     void roleChanged(const QByteArray &current, const QByteArray &previous) override;
