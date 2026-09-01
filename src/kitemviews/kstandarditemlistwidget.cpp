@@ -1575,7 +1575,13 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
         y += nameHeight + gap;
 
         // --- line 2: the capacity bar ---
-        const qreal barWidth = qMin(availableWidth, qreal(220));
+        /* Fill the width the tile actually has, rather than a fixed 220.
+           In the icons grid the cell is sized around a 220px bar anyway, so
+           this changes nothing there. In details layout the row spans the
+           whole view, so the bar and the free-space line under it now grow and
+           shrink with the window instead of staying stuck at their old width.
+           Capped so a maximised window does not draw one enormous bar. */
+        const qreal barWidth = qMin(availableWidth, qMax(qreal(220), availableWidth * 0.6));
         m_capacityBarRect = QRectF(x, y, barWidth, barHeight);
         y += barHeight + gap;
 
