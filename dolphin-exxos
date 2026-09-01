@@ -1,0 +1,22 @@
+#!/bin/bash
+# Launch the patched (Exxos/Win7 tile view) Dolphin.
+#
+# The packaged /usr/bin/dolphin is deliberately NOT replaced: apt would
+# overwrite it on the next update, and a broken system file manager is a bad
+# failure mode. This runs the locally built binary instead, so the stock one
+# stays intact as a fallback.
+#
+# On MX 21 this also had to put the staged toolchain on LD_LIBRARY_PATH,
+# because Qt5/KF5 -dev packages could not be installed there. MX 23 can install
+# them, so the build links against the system libraries and no override is
+# wanted -- forcing one now would risk mixing library versions.
+HERE="$(cd "$(dirname "$0")" && pwd)"
+BIN="$HERE/build/bin/dolphin"
+
+if [ ! -x "$BIN" ]; then
+    echo "Exxos Dolphin is not built: $BIN" >&2
+    echo "Falling back to the system file manager." >&2
+    exec /usr/bin/dolphin "$@"
+fi
+
+exec "$BIN" "$@"
