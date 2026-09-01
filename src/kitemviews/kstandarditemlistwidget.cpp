@@ -1182,6 +1182,33 @@ void KStandardItemListWidget::updatePixmapCache()
            negative, so the icon can no longer be clipped at the widget edge. */
         if (m_isTile) {
             m_pixmapPos.setX(padding);
+
+            /* The text column was placed by updateTextsCache() against the
+               RESERVED icon box, which is worked out before the pixmap is
+               scaled and so cannot know how wide the icon really ends up. When
+               the scaled pixmap turns out wider than that box -- it does at the
+               smaller zoom levels -- the gap collapses and the name and the
+               capacity bar end up against the icon.
+
+               The real width is known here, so close the difference by pushing
+               the text, the bar and the free-space line right. */
+            const qreal wantX = padding + m_scaledPixmapSize.width()
+                              + exxosTileIconGap(styleOption().iconSize);
+            TextInfo* nameInfo = m_textInfo.value("text");
+            if (nameInfo && wantX > nameInfo->pos.x()) {
+                const qreal shift = wantX - nameInfo->pos.x();
+                nameInfo->pos.setX(nameInfo->pos.x() + shift);
+                m_capacityFreeTextPos.setX(m_capacityFreeTextPos.x() + shift);
+                if (!m_capacityBarRect.isEmpty()) {
+                    m_capacityBarRect.moveLeft(m_capacityBarRect.left() + shift);
+                    // keep it inside the widget
+                    const qreal maxRight = widgetSize.width() - padding;
+                    if (m_capacityBarRect.right() > maxRight) {
+                        m_capacityBarRect.setRight(maxRight);
+                    }
+                }
+                m_textRect.setLeft(m_textRect.left() + shift);
+            }
         }
     }
 
@@ -1640,7 +1667,16 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
            whole view, so the bar and the free-space line under it now grow and
            shrink with the window instead of staying stuck at their old width.
            Capped so a maximised window does not draw one enormous bar. */
-        const qreal barWidth = qMin(availableWidth, qMax(qreal(220), availableWidth * 0.6));
+        /* In the icons grid the CELL was already sized for the bar -- the width
+           is icon + gap + 220*tileScale -- so the bar should simply take the
+           width it has. The 0.6 cap below is for the details layout, where the
+           row spans the whole window and an unbounded bar would be silly.
+           Applying that cap in the grid too meant the bar stopped growing with
+           the zoom while the text carried on: at 32px it was twice the length
+           of the text, and further up it fell behind. */
+        const qreal barWidth = (m_layout == IconsLayout)
+                             ? availableWidth
+                             : qMin(availableWidth, qMax(qreal(220), availableWidth * 0.6));
         /* Snap to whole pixels. The bar is drawn with antialiasing OFF -- a
            1px border with the fill inset 1px inside it -- so a fractional
            left edge makes the border and the fill round to different pixels
