@@ -1167,6 +1167,12 @@ void KStandardItemListWidget::updatePixmapCache()
                     - m_customizedFontMetrics.capHeight() / 2.0;
         m_pixmapPos.setY(m_textRect.center().y() + midlineShift - m_scaledPixmapSize.height() / 2.0);
 
+        /* Belt and braces for the tile: never let the icon start left of the
+           widget. If it ever does it is silently clipped, which is very hard
+           to recognise as a layout bug -- it just looks like a redraw fault. */
+        if (m_isTile && m_pixmapPos.x() < padding) {
+            m_pixmapPos.setX(padding);
+        }
     }
 
     if (m_layout == IconsLayout) {
@@ -1554,9 +1560,16 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
     const qreal widgetHeight = size().height();
     /* In details layout the row height defines the icon box; in icons layout
        the cell is taller than the icon, so the configured icon size is used. */
+    /* Use iconSize(), NOT option.iconSize.
+       They are different values: iconSize() is the widget's own m_iconSize,
+       and it is what updatePixmapCache() scales the pixmap to fit. Reserving
+       the box with option.iconSize instead meant that whenever the two
+       disagreed the pixmap came out wider than the box it was centred in, so
+       m_pixmapPos.x went NEGATIVE and the icon was clipped at the widget's
+       left edge -- the missing left-hand side of the icon. */
     const int scaledIconSize = (m_layout == IconsLayout)
-                             ? option.iconSize
-                             : int(widgetHeight - 2 * option.padding);
+                             ? iconSize()
+                             : qMax(iconSize(), int(widgetHeight - 2 * option.padding));
 
     // Text column starts just right of the icon, as in Explorer.
     const qreal x = scaledIconSize + 2 * option.padding;
