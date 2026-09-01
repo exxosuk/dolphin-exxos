@@ -32,6 +32,132 @@
 
 #include <Solid/StorageAccess>
 
+#include <QAbstractItemDelegate>
+#include <QPainter>
+#include <KFilePlacesModel>
+
+
+/* ---------------------------------------------------------------------------
+   Exxos/Win7: Places panel appearance.
+
+   Dolphin 22.12 replaced its own KItemViews-based places widget with KIO's
+   KFilePlacesView, so the previous patch (placesitemlistwidget.cpp) had nowhere
+   to land. Two things had to be recovered, and KIO's delegate is private, so
+   neither can be reached by subclassing it.
+
+   The obstacle is that KIO's delegate uses QPalette::Highlight for BOTH the
+   selected-row background AND the capacity bar fill. On this desktop Highlight
+   is a grey, deliberately, so the capacity bars came out grey-on-grey and were
+   almost invisible -- the same collision the original patch had to solve.
+
+   A QProxyStyle cannot help: the delegate calls QApplication::style() with no
+   widget argument, so there is nothing to discriminate on. Instead this wraps
+   the delegate. We paint the row background ourselves, hand KIO's delegate a
+   state with Selected/MouseOver cleared so it does not paint one on top, and
+   set Highlight to the purple we actually want for the bar.
+   --------------------------------------------------------------------------- */
+namespace {
+
+static const QColor EXXOS_CAPACITY_USED(108,  68, 158);   // purple, deep enough to read
+static const QColor EXXOS_CAPACITY_SELECTED(78, 44, 120); // darker still, on a selected row
+static const qreal  EXXOS_HOVER_ALPHA = 0.55;             // matches the file view
+
+// Mirrors KFilePlacesViewDelegate's own header geometry, which is private.
+static constexpr int s_lateralMargin = 4;
+
+class ExxosPlacesDelegate : public QAbstractItemDelegate
+{
+public:
+    ExxosPlacesDelegate(QAbstractItemDelegate *inner, QListView *view)
+        : QAbstractItemDelegate(view), m_inner(inner), m_view(view) {}
+
+    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        return m_inner->sizeHint(option, index);
+    }
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        QStyleOptionViewItem opt = option;
+        const bool selected = opt.state & QStyle::State_Selected;
+        const bool hovered  = opt.state & QStyle::State_MouseOver;
+
+        /* The row rect includes the section header when this item starts a
+           group, and the header must not sit on the selection wash -- so trim
+           it off exactly the way KIO's delegate does before it paints. */
+        QRect rowRect = opt.rect;
+        if (indexIsSectionHeader(index)) {
+            rowRect.setTop(rowRect.top() + sectionHeaderHeight(index));
+        }
+
+        if (selected || hovered) {
+            QColor c = option.palette.color(QPalette::Highlight);
+            if (!selected) {
+                c.setAlphaF(EXXOS_HOVER_ALPHA);   // hover is a lighter wash of the same grey
+            }
+            painter->save();
+            painter->setRenderHint(QPainter::Antialiasing);
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(c);
+            painter->drawRoundedRect(rowRect, 3, 3);
+            painter->restore();
+        }
+
+        // Stop KIO drawing its own background over ours.
+        opt.state &= ~(QStyle::State_Selected | QStyle::State_MouseOver);
+        // ...and give the capacity bar a colour of its own.
+        opt.palette.setColor(QPalette::Highlight,
+                             selected ? EXXOS_CAPACITY_SELECTED : EXXOS_CAPACITY_USED);
+
+        m_inner->paint(painter, opt, index);
+    }
+
+private:
+    QString groupName(const QModelIndex &index) const
+    {
+        return index.isValid() ? index.data(KFilePlacesModel::GroupRole).toString() : QString();
+    }
+
+    QModelIndex previousVisibleIndex(const QModelIndex &index) const
+    {
+        if (!index.isValid() || index.row() == 0) {
+            return QModelIndex();
+        }
+        const QAbstractItemModel *model = index.model();
+        QModelIndex prev = model->index(index.row() - 1, index.column(), index.parent());
+        while (m_view->isRowHidden(prev.row())) {
+            if (prev.row() == 0) {
+                return QModelIndex();
+            }
+            prev = model->index(prev.row() - 1, index.column(), index.parent());
+        }
+        return prev;
+    }
+
+    bool indexIsSectionHeader(const QModelIndex &index) const
+    {
+        if (m_view->isRowHidden(index.row())) {
+            return false;
+        }
+        return groupName(index) != groupName(previousVisibleIndex(index));
+    }
+
+    int sectionHeaderHeight(const QModelIndex &index) const
+    {
+        const int spacing = s_lateralMargin + m_view->spacing();
+        int height = m_view->fontMetrics().height() + spacing;
+        if (index.row() != 0) {
+            height += 2 * spacing;
+        }
+        return height;
+    }
+
+    QAbstractItemDelegate *m_inner;
+    QListView *m_view;
+};
+
+} // namespace
+
 PlacesPanel::PlacesPanel(QWidget* parent)
     : KFilePlacesView(parent)
 {
@@ -40,6 +166,13 @@ PlacesPanel::PlacesPanel(QWidget* parent)
             this, &PlacesPanel::slotUrlsDropped);
 
     setAutoResizeItemsEnabled(false);
+
+    /* Exxos/Win7: wrap KIO's delegate. KFilePlacesView installs its own in its
+       constructor and keeps a private pointer for its animations, so replacing
+       the VIEW's delegate changes only what gets painted. */
+    if (QAbstractItemDelegate *inner = itemDelegate()) {
+        setItemDelegate(new ExxosPlacesDelegate(inner, this));
+    }
 
     setTeardownFunction([this](const QModelIndex &index) {
         slotTearDownRequested(index);
