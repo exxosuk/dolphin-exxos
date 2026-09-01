@@ -1575,10 +1575,16 @@ bool KStandardItemListWidget::hasCapacityInfo() const
 
 qreal KStandardItemListWidget::exxosTileScale(int iconSize)
 {
-    /* 48 is the tile floor and the size the tile was designed at. Growth is
-       gentler than the icon's own, so the text does not become comical beside
-       a very large icon, and it never drops below 1. */
-    return qBound(qreal(1.0), qreal(1.0) + (qMax(1, iconSize) - 48.0) / 48.0 * 0.5, qreal(2.2));
+    /* Measured from 32, the slider's minimum, NOT from 48.
+
+       With 48 as the base this returned exactly 1.0 for every icon size up to
+       48, so the first two zoom stops produced identical text and identical
+       bars and only the icon changed -- the tile as a whole appeared not to
+       grow at all. Starting at 32 means every stop scales something visible.
+
+       Growth stays gentler than the icon's own so the text does not become
+       comical beside a very large icon, and it never drops below 1. */
+    return qBound(qreal(1.0), qreal(1.0) + (qMax(1, iconSize) - 32.0) / 48.0 * 0.5, qreal(2.2));
 }
 
 int KStandardItemListWidget::exxosTileIconGap(int iconSize)
