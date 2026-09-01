@@ -63,6 +63,13 @@
 #include <KSycoca>
 #include <KTerminalLauncherJob>
 #include <KToggleAction>
+#include <KConfigGroup>
+#include <KSharedConfig>
+#include <Solid/DeviceNotifier>
+#include <Solid/StorageVolume>
+#include <Solid/StorageAccess>
+#include <Solid/DeviceInterface>
+#include <Solid/Device>
 #include <KToolBar>
 #include <KToolBarPopupAction>
 #include <KUrlComboBox>
@@ -1546,6 +1553,60 @@ void DolphinMainWindow::setViewsToHomeIfMountPathOpen(const QString& mountPath)
     disconnect(m_placesPanel, &PlacesPanel::storageTearDownSuccessful, nullptr, nullptr);
 }
 
+
+/* Exxos/Win7: see setupActions(). Mounts removable volumes as they appear. */
+void DolphinMainWindow::slotToggleAutoMount(bool enabled)
+{
+    if (enabled) {
+        const int answer = KMessageBox::warningContinueCancel(this,
+            xi18nc("@info",
+                   "<para>Removable media will be mounted as soon as it is "
+                   "inserted, with no prompt.</para>"
+                   "<para><emphasis>This carries a risk.</emphasis> Mounting "
+                   "reads the filesystem on whatever has been plugged in, so a "
+                   "malformed or deliberately malicious one is parsed by the "
+                   "kernel without you having agreed to it. Leave this off if "
+                   "machines you do not control are ever plugged into this "
+                   "one.</para>"),
+            i18nc("@title:window", "Automatically Mount Removable Media"),
+            KStandardGuiItem::cont(), KStandardGuiItem::cancel(),
+            QStringLiteral("exxosAutoMountWarning"));
+        if (answer != KMessageBox::Continue) {
+            if (auto *a = actionCollection()->action(QStringLiteral("exxos_auto_mount"))) {
+                static_cast<KToggleAction *>(a)->setChecked(false);
+            }
+            return;
+        }
+    }
+
+    KConfigGroup group = KSharedConfig::openConfig()->group("Exxos");
+    group.writeEntry("AutoMountRemovable", enabled);
+    group.sync();
+
+    if (enabled) {
+        // Mount anything already sitting there unmounted.
+        exxosMountRemovableVolumes();
+    }
+}
+
+/* Mount every removable volume that is not mounted yet. Called when the
+   setting is switched on and whenever a device appears while it is on. */
+void DolphinMainWindow::exxosMountRemovableVolumes()
+{
+    const auto devices = Solid::Device::listFromType(Solid::DeviceInterface::StorageAccess, QString());
+    for (const Solid::Device &dev : devices) {
+        auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>());
+        if (!access || access->isAccessible()) {
+            continue;
+        }
+        const auto *volume = dev.as<Solid::StorageVolume>();
+        if (volume && volume->isIgnored()) {
+            continue;
+        }
+        access->setup();   // asynchronous; udisks does the work
+    }
+}
+
 void DolphinMainWindow::setupActions()
 {
     auto hamburgerMenuAction = KStandardAction::hamburgerMenu(nullptr, nullptr, actionCollection());
@@ -1764,6 +1825,39 @@ void DolphinMainWindow::setupActions()
     stop->setWhatsThis(i18nc("@info", "This stops the loading of the contents of the current folder."));
     stop->setIcon(QIcon::fromTheme(QStringLiteral("process-stop")));
     connect(stop, &QAction::triggered, this, &DolphinMainWindow::stopLoading);
+
+    /* Exxos/Win7: automatically mount removable media.
+
+       MX pops up a "what do you want to do?" box on every insertion. This is
+       the Windows behaviour instead: the volume is mounted as soon as it
+       appears and the drive is simply usable.
+
+       Off by default and warns on first enable, because it IS a real
+       relaxation -- see the message text. */
+    KToggleAction* autoMount = actionCollection()->add<KToggleAction>(QStringLiteral("exxos_auto_mount"));
+    autoMount->setText(i18nc("@action:inmenu Settings", "Automatically Mount Removable Media"));
+    autoMount->setWhatsThis(xi18nc("@info:whatsthis",
+        "Mounts a disc, memory card or USB drive as soon as it is inserted, "
+        "instead of asking what to do with it.<nl/><nl/>"
+        "<emphasis>This carries a risk.</emphasis> Mounting reads the "
+        "filesystem on whatever has been plugged in, so a malformed or "
+        "deliberately malicious one is parsed by the kernel without you having "
+        "agreed to it. Leave this off if machines you do not control are ever "
+        "plugged into this one."));
+    autoMount->setChecked(KSharedConfig::openConfig()->group("Exxos").readEntry("AutoMountRemovable", false));
+    connect(autoMount, &KToggleAction::triggered, this, &DolphinMainWindow::slotToggleAutoMount);
+
+    /* Mount on insertion while the setting is on. deviceAdded fires before
+       udisks has finished probing, so give it a moment or setup() is called on
+       a volume that does not exist yet -- the same timing that made the
+       computer:/ view refresh too early. */
+    connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceAdded,
+            this, [this](const QString &) {
+                if (!KSharedConfig::openConfig()->group("Exxos").readEntry("AutoMountRemovable", false)) {
+                    return;
+                }
+                QTimer::singleShot(1200, this, [this]() { exxosMountRemovableVolumes(); });
+            });
 
     KToggleAction* editableLocation = actionCollection()->add<KToggleAction>(QStringLiteral("editable_location"));
     editableLocation->setText(i18nc("@action:inmenu Navigation Bar", "Editable Location"));

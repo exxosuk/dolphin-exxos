@@ -613,6 +613,10 @@ private:
     /**
      * Sets up the various menus and actions and connects them.
      */
+    /* Exxos/Win7: auto-mount removable media, and the toggle behind it. */
+    void slotToggleAutoMount(bool enabled);
+    void exxosMountRemovableVolumes();
+
     void setupActions();
 
     /**
