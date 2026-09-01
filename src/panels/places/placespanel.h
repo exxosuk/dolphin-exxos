@@ -53,6 +53,10 @@ Q_SIGNALS:
     void storageTearDownSuccessful();
 
 protected:
+    /* Exxos/Win7: add drive hardware that has no mountable volume --
+       an empty CD tray, an empty card slot -- which KFilePlacesModel omits. */
+    void syncHardwarePlaces();
+
     void showEvent(QShowEvent* event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;
 

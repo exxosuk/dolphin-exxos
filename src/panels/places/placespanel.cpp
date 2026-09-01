@@ -31,6 +31,9 @@
 #include <QShowEvent>
 
 #include <Solid/StorageAccess>
+#include <Solid/StorageDrive>
+#include <Solid/OpticalDrive>
+#include <QSet>
 
 #include <QAbstractItemDelegate>
 #include <QPainter>
@@ -267,6 +270,118 @@ void PlacesPanel::readSettings()
     setIconSize(QSize(iconSize, iconSize));
 }
 
+/* --------------------------------------------------------------------------
+   Exxos/Win7: list drive HARDWARE, not only mountable volumes.
+
+   KFilePlacesModel lists devices that expose a volume. Hardware with no medium
+   in it does not: an empty CD/DVD tray, an empty card-reader slot. So the CD
+   drive was absent from this panel entirely -- the same gap the computer:/
+   worker had, in code that is KIO's rather than ours.
+
+   The panel's model cannot be swapped for a proxy: KIO's delegate static_casts
+   it to KFilePlacesModel, so anything else is undefined behaviour. But the
+   model does take ordinary places through addPlace(), and each drive already
+   has a stable address in our own worker -- computer:/<udi> -- which mounts on
+   open. So an empty bay is added as a place pointing there, and clicking it
+   behaves exactly like clicking it in the main view.
+
+   Entries are matched on that URL, so re-running is harmless and a bay that
+   already has a volume (the model lists it itself) is never duplicated.
+   -------------------------------------------------------------------------- */
+void PlacesPanel::syncHardwarePlaces()
+{
+    auto *placesModel = qobject_cast<KFilePlacesModel *>(model());
+    if (!placesModel) {
+        return;
+    }
+
+    // Drives that already have a volume, so the model shows them itself.
+    QSet<QString> coveredDrives;
+    const auto volumes = Solid::Device::listFromType(Solid::DeviceInterface::StorageAccess, QString());
+    for (const Solid::Device &dev : volumes) {
+        const Solid::Device parent = dev.parent();
+        if (parent.is<Solid::StorageDrive>()) {
+            coveredDrives.insert(parent.udi());
+        }
+    }
+
+    // Every bay currently present, as the URL it would be listed under.
+    QSet<QString> liveBays;
+    {
+        const auto all = Solid::Device::listFromType(Solid::DeviceInterface::StorageDrive, QString());
+        for (const Solid::Device &dev : all) {
+            QString n = dev.udi();
+            n.replace(QLatin1Char('/'), QLatin1Char('_'));
+            liveBays.insert(QStringLiteral("computer:/") + n);
+        }
+    }
+
+    /* Drop entries we added for hardware that has since gone, and for bays
+       that have acquired a volume -- the model lists those itself now, and
+       leaving ours behind would show the drive twice. addPlace() writes a
+       persistent bookmark, so without this they would pile up every time a
+       USB device was unplugged. */
+    for (int i = placesModel->rowCount() - 1; i >= 0; --i) {
+        const QModelIndex idx = placesModel->index(i, 0);
+        const QString u = placesModel->url(idx).toString();
+        if (!u.startsWith(QLatin1String("computer:/"))) {
+            continue;                       // not one of ours
+        }
+        const bool goneOrMounted = !liveBays.contains(u)
+            || [&] {
+                   for (const QString &covered : coveredDrives) {
+                       QString n = covered;
+                       n.replace(QLatin1Char('/'), QLatin1Char('_'));
+                       if (u == QStringLiteral("computer:/") + n) {
+                           return true;
+                       }
+                   }
+                   return false;
+               }();
+        if (goneOrMounted) {
+            placesModel->removePlace(idx);
+        }
+    }
+
+    // URLs this panel already carries, so nothing is added twice.
+    QSet<QString> existing;
+    for (int i = 0; i < placesModel->rowCount(); ++i) {
+        existing.insert(placesModel->url(placesModel->index(i, 0)).toString());
+    }
+
+    const auto drives = Solid::Device::listFromType(Solid::DeviceInterface::StorageDrive, QString());
+    for (const Solid::Device &dev : drives) {
+        const auto *drive = dev.as<Solid::StorageDrive>();
+        if (!drive) {
+            continue;
+        }
+        const bool isOptical = dev.is<Solid::OpticalDrive>();
+        if (!isOptical && !(drive->isRemovable() || drive->isHotpluggable())) {
+            continue;   // an internal disk with no volume is not worth listing
+        }
+        if (coveredDrives.contains(dev.udi())) {
+            continue;
+        }
+
+        /* Same address the computer:/ worker gives it: the UDI with slashes
+           replaced, because a UDS_NAME may not contain one. */
+        QString name = dev.udi();
+        name.replace(QLatin1Char('/'), QLatin1Char('_'));
+        const QUrl url(QStringLiteral("computer:/") + name);
+        if (existing.contains(url.toString())) {
+            continue;
+        }
+
+        QString label = dev.displayName();
+        if (label.isEmpty()) {
+            label = isOptical ? i18n("CD/DVD Drive") : i18n("Removable Drive");
+        }
+        placesModel->addPlace(label, url,
+                              isOptical ? QStringLiteral("drive-optical")
+                                        : QStringLiteral("drive-removable-media"));
+    }
+}
+
 void PlacesPanel::showEvent(QShowEvent* event)
 {
     if (!event->spontaneous() && !model()) {
@@ -285,6 +400,7 @@ void PlacesPanel::showEvent(QShowEvent* event)
         }
 
         setUrl(m_url);
+        syncHardwarePlaces();
     }
 
     KFilePlacesView::showEvent(event);
