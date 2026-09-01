@@ -33,6 +33,7 @@
 #include <Solid/StorageAccess>
 #include <Solid/StorageDrive>
 #include <Solid/OpticalDrive>
+#include <Solid/DeviceNotifier>
 #include <QSet>
 
 #include <QAbstractItemDelegate>
@@ -295,13 +296,23 @@ void PlacesPanel::syncHardwarePlaces()
         return;
     }
 
-    // Drives that already have a volume, so the model shows them itself.
+    /* Drives that already have a volume, so the model shows them itself.
+
+       Do NOT assume the volume's immediate parent is the StorageDrive. It is
+       for a partition on a disk, but an optical disc is its own device under
+       the drive, so with a disc inserted coverage was never recorded and the
+       CD appeared twice -- once as its volume label under Removable Devices
+       and again as the empty bay we had added. Walk up to the drive. */
     QSet<QString> coveredDrives;
     const auto volumes = Solid::Device::listFromType(Solid::DeviceInterface::StorageAccess, QString());
     for (const Solid::Device &dev : volumes) {
-        const Solid::Device parent = dev.parent();
-        if (parent.is<Solid::StorageDrive>()) {
-            coveredDrives.insert(parent.udi());
+        Solid::Device p = dev.parent();
+        for (int depth = 0; p.isValid() && depth < 6; ++depth) {
+            if (p.is<Solid::StorageDrive>()) {
+                coveredDrives.insert(p.udi());
+                break;
+            }
+            p = p.parent();
         }
     }
 
@@ -401,6 +412,16 @@ void PlacesPanel::showEvent(QShowEvent* event)
 
         setUrl(m_url);
         syncHardwarePlaces();
+
+        /* Re-sync whenever hardware appears or disappears. Inserting a disc
+           gives the drive a volume, so the model lists it itself and our
+           empty-bay entry has to go, or the drive shows twice. Ejecting undoes
+           that. Doing this only on showEvent left both entries on screen for
+           as long as the panel stayed open. */
+        connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceAdded,
+                this, [this](const QString &) { syncHardwarePlaces(); });
+        connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceRemoved,
+                this, [this](const QString &) { syncHardwarePlaces(); });
     }
 
     KFilePlacesView::showEvent(event);
