@@ -417,7 +417,24 @@ void PlacesPanel::showEvent(QShowEvent* event)
         }
 
         setUrl(m_url);
-        syncHardwarePlaces();
+        /* syncHardwarePlaces() is DISABLED.
+
+           It worked -- empty bays appeared and were clickable -- but they landed
+           under "Places" rather than "Removable Devices", and that cannot be
+           corrected from here. KFilePlacesItem::groupType() only returns
+           RemovableDevicesType when the item is a device, an item is a device
+           only when its bookmark carries a UDI, and KFilePlacesModel drops a
+           UDI-carrying bookmark unless the device passes a predicate requiring
+           a StorageVolume or StorageAccess -- which an empty bay fails by
+           definition. Grouping it correctly and showing it while empty are the
+           same flag.
+
+           An entry in visibly the wrong section is worse than no entry, so it
+           stays off until this is done properly, which means replacing
+           KFilePlacesModel rather than extending it. The code is kept because
+           the analysis behind it is worth not repeating.
+
+           syncHardwarePlaces();  */
 
         /* Re-sync whenever hardware appears or disappears. Inserting a disc
            gives the drive a volume, so the model lists it itself and our
