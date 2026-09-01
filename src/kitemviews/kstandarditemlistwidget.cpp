@@ -1691,6 +1691,22 @@ void KStandardItemListWidget::drawCapacityBar(QPainter* painter) const
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, false);
 
+    /* Snap the painter's origin to a whole device pixel first.
+
+       The tile columns do not land on integers -- with four columns the pitch
+       here is 313.33px -- so a widget's origin can sit on a half pixel. The
+       bar is a 1px border with the fill inset 1px inside it, and when the
+       origin is fractional those two round to DIFFERENT device pixels: the
+       fill then starts 2px inside its own border instead of 1, but only in
+       the columns whose offset happens to round the wrong way. That is why it
+       showed on the right-hand columns and not the left.
+
+       Rounding m_capacityBarRect is not enough on its own, because the offset
+       comes from the transform rather than from the rect. */
+    const QPointF origin = painter->transform().map(QPointF(0, 0));
+    painter->translate(qRound(origin.x()) - origin.x(),
+                       qRound(origin.y()) - origin.y());
+
     // track + border
     painter->setPen(QColor(161, 161, 161));
     painter->setBrush(QColor(251, 251, 251));
