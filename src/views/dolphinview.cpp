@@ -879,14 +879,19 @@ void DolphinView::stopLoading()
 void DolphinView::updatePalette()
 {
     QColor color = KColorScheme(isActiveWindow() ? QPalette::Active : QPalette::Inactive, KColorScheme::View).background().color();
-    /* Exxos/Win7: do NOT fade the inactive pane.
+    /* Exxos/Win7: give BOTH panes the softer background.
 
-       Upstream drops the background to alpha 150 in the pane that does not
-       have focus. Over the window beneath, that turns the off-white view
-       colour (252,252,251) into something visibly whiter, so in split view the
-       two panes did not match and the right-hand one looked pure white.
-       Explorer draws both panes the same; which one is active is already shown
-       by the selection and the frame. */
+       Upstream drops the background to alpha 150 in whichever pane lacks
+       focus, so it composites the view colour (252,252,251) over the window
+       grey beneath and comes out a warm off-white. The focused pane keeps the
+       raw colour, which is very nearly pure white.
+
+       Splitting the view moves focus to the NEW pane, so the new one went
+       stark white next to the softer original -- and matching them by dropping
+       the alpha made both stark instead. The off-white is the one worth
+       keeping, so apply it to both and let selection and frame show which pane
+       is active. */
+    color.setAlpha(150);
 
     QWidget* viewport = m_container->viewport();
     if (viewport) {

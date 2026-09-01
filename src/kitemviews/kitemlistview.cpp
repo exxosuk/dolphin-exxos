@@ -1882,9 +1882,20 @@ void KItemListView::doLayout(LayoutAnimationHint hint, int changedIndex, int cha
             } else {
                 widget->resize(itemBounds.size());
             }
-        } else {
-            animateIconResizing = false;
         }
+        /* Exxos/Win7: an unchanged CELL is not a reason to skip the icon
+           animation.
+
+           Upstream cleared animateIconResizing whenever the widget's own size
+           happened to come out the same, so the icon then jumped to its new
+           size instead of growing into it. On a capacity tile the cell height
+           is max(iconSize, three lines of text), so at the zoom steps where
+           the text block stayed the taller the cell did not change at all --
+           and those were exactly the steps that snapped. That is the "zooms
+           smoothly sometimes, hard size change other times" behaviour.
+
+           The icon size changing is reason enough to animate it; `animate`
+           still gates whether any animation happens at all. */
 
         const int newIconSize = widget->styleOption().iconSize;
         if (widget->iconSize() != newIconSize) {
