@@ -271,7 +271,10 @@ void DolphinItemListView::updateGridSize()
             const qreal tileScale = KStandardItemListWidget::exxosTileScale(effectiveIconSize);
             const int barWidth  = qRound(220 * tileScale);
             const int textBlock = qRound(3 * option.fontMetrics.lineSpacing() * tileScale);
-            itemWidth  = padding * 4 + effectiveIconSize + barWidth;
+            // icon + the gap the widget leaves after it + the bar
+            itemWidth  = padding * 2 + effectiveIconSize
+                       + KStandardItemListWidget::exxosTileIconGap(effectiveIconSize)
+                       + barWidth;
             itemHeight = padding * 3 + qMax(effectiveIconSize, textBlock);
             horizontalMargin = 8;
             verticalMargin = 4;

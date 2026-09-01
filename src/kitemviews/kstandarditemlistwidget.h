@@ -112,6 +112,13 @@ public:
        free-space line -- rather than only the icon growing while the text and
        the bar stay the size they were. */
     static qreal exxosTileScale(int iconSize);
+
+    /* Gap between the icon and the text column in a tile. Explorer leaves a
+       clear channel there; 2*padding (4px) is not enough and at higher zoom
+       the name and the capacity bar end up touching the icon. Shared with
+       DolphinItemListView::updateGridSize() so the cell is wide enough for
+       icon + gap + bar. */
+    static int exxosTileIconGap(int iconSize);
     QFont exxosTileFont() const;
 
 protected:

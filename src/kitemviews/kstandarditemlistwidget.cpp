@@ -1529,6 +1529,11 @@ qreal KStandardItemListWidget::exxosTileScale(int iconSize)
     return qBound(qreal(1.0), qreal(1.0) + (qMax(1, iconSize) - 48.0) / 48.0 * 0.5, qreal(2.2));
 }
 
+int KStandardItemListWidget::exxosTileIconGap(int iconSize)
+{
+    return qRound(14.0 * exxosTileScale(iconSize));
+}
+
 QFont KStandardItemListWidget::exxosTileFont() const
 {
     QFont tileFont = m_customizedFont;
@@ -1578,8 +1583,10 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
                              : qMax(qMax(iconSize(), option.iconSize),
                                     int(widgetHeight - 2 * option.padding));
 
-    // Text column starts just right of the icon, as in Explorer.
-    const qreal x = scaledIconSize + 2 * option.padding;
+    // Text column starts right of the icon, with a clear gap -- Explorer
+    // leaves a channel there, and 2*padding put the name and the bar hard
+    // against the icon once the tile was zoomed up.
+    const qreal x = scaledIconSize + exxosTileIconGap(option.iconSize);
     const qreal availableWidth = size().width() - x - 2 * option.padding;
 
     const QFont tileFont = exxosTileFont();
