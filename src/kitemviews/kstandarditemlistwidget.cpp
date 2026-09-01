@@ -1167,10 +1167,20 @@ void KStandardItemListWidget::updatePixmapCache()
                     - m_customizedFontMetrics.capHeight() / 2.0;
         m_pixmapPos.setY(m_textRect.center().y() + midlineShift - m_scaledPixmapSize.height() / 2.0);
 
-        /* Belt and braces for the tile: never let the icon start left of the
-           widget. If it ever does it is silently clipped, which is very hard
-           to recognise as a layout bug -- it just looks like a redraw fault. */
-        if (m_isTile && m_pixmapPos.x() < padding) {
+        /* Exxos/Win7: a tile LEFT-ALIGNS its icon.
+
+           The formula above centres the pixmap inside the reserved icon box.
+           That box is the larger of iconSize() and styleOption().iconSize, so
+           whenever they differ it is wider than the pixmap and the centring
+           put half the slack on the LEFT -- every icon pushed away from the
+           edge of the view by a gap that grew with the zoom. Explorer puts the
+           icon hard against the left margin, so pin it there and let all the
+           slack fall on the right, where it reads as part of the gap before
+           the text.
+
+           This also subsumes the clamp this replaces: x can no longer go
+           negative, so the icon can no longer be clipped at the widget edge. */
+        if (m_isTile) {
             m_pixmapPos.setX(padding);
         }
     }
@@ -1631,7 +1641,11 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
            shrink with the window instead of staying stuck at their old width.
            Capped so a maximised window does not draw one enormous bar. */
         const qreal barWidth = qMin(availableWidth, qMax(qreal(220), availableWidth * 0.6));
-        m_capacityBarRect = QRectF(x, y, barWidth, barHeight);
+        /* Snap to whole pixels. The bar is drawn with antialiasing OFF -- a
+           1px border with the fill inset 1px inside it -- so a fractional
+           left edge makes the border and the fill round to different pixels
+           and the fill appears to start short of its own border. */
+        m_capacityBarRect = QRectF(qRound(x), qRound(y), qRound(barWidth), barHeight);
         y += barHeight + gap;
 
         // --- line 3: "<free> free of <total>" ---
