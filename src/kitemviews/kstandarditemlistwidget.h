@@ -106,6 +106,14 @@ public:
 
     static KItemListWidgetInformant* createInformant();
 
+public:
+    /* Exxos/Win7: how much bigger a tile is than at the 48px base size.
+       The WHOLE tile scales with the zoom -- icon, name, capacity bar and the
+       free-space line -- rather than only the icon growing while the text and
+       the bar stay the size they were. */
+    static qreal exxosTileScale(int iconSize);
+    QFont exxosTileFont() const;
+
 protected:
     /**
      * Invalidates the cache which results in calling KStandardItemListWidget::refreshCache() as

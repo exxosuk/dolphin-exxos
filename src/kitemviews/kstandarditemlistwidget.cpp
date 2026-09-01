@@ -420,7 +420,7 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
 
     /* Exxos/Win7 tile: the drive name is bold, as in Explorer. */
     if (m_isTile) {
-        QFont boldFont = m_customizedFont;
+        QFont boldFont = exxosTileFont();
         boldFont.setBold(true);
         painter->setFont(boldFont);
     } else {
@@ -446,7 +446,7 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
     if (m_isTile) {
         drawCapacityBar(painter);
         if (!m_capacityFreeText.text().isEmpty()) {
-            painter->setFont(m_customizedFont);
+            painter->setFont(exxosTileFont());
             painter->setPen(m_additionalInfoTextColor);
             painter->drawStaticText(m_capacityFreeTextPos, m_capacityFreeText);
             painter->setPen(textColor());
@@ -1515,6 +1515,26 @@ bool KStandardItemListWidget::hasCapacityInfo() const
     return values.value("totalSpace").toULongLong() > 0;
 }
 
+qreal KStandardItemListWidget::exxosTileScale(int iconSize)
+{
+    /* 48 is the tile floor and the size the tile was designed at. Growth is
+       gentler than the icon's own, so the text does not become comical beside
+       a very large icon, and it never drops below 1. */
+    return qBound(qreal(1.0), qreal(1.0) + (qMax(1, iconSize) - 48.0) / 48.0 * 0.5, qreal(2.2));
+}
+
+QFont KStandardItemListWidget::exxosTileFont() const
+{
+    QFont tileFont = m_customizedFont;
+    const qreal scale = exxosTileScale(styleOption().iconSize);
+    if (tileFont.pointSizeF() > 0) {
+        tileFont.setPointSizeF(tileFont.pointSizeF() * scale);
+    } else if (tileFont.pixelSize() > 0) {
+        tileFont.setPixelSize(qRound(tileFont.pixelSize() * scale));
+    }
+    return tileFont;
+}
+
 void KStandardItemListWidget::updateTilesLayoutTextCache()
 {
     m_textRect = QRectF();
@@ -1542,12 +1562,14 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
     const qreal x = scaledIconSize + 2 * option.padding;
     const qreal availableWidth = size().width() - x - 2 * option.padding;
 
-    QFont boldFont = m_customizedFont;
+    const QFont tileFont = exxosTileFont();
+    QFont boldFont = tileFont;
     boldFont.setBold(true);
     const QFontMetrics boldMetrics(boldFont);
+    const QFontMetrics tileMetrics(tileFont);
 
     const int nameHeight = boldMetrics.height();
-    const int freeHeight = m_customizedFontMetrics.height();
+    const int freeHeight = tileMetrics.height();
     const int barHeight  = qMax(9, freeHeight - 4);
     const qreal gap      = qMax(qreal(1), qreal(option.padding) / 2);
 
@@ -1590,8 +1612,8 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
                                        "%1 free of %2",
                                        win7Size(m_freeSpace),
                                        win7Size(m_totalSpace));
-        m_capacityFreeText.setText(m_customizedFontMetrics.horizontalAdvance(freeText) > availableWidth
-                                   ? m_customizedFontMetrics.elidedText(freeText, Qt::ElideRight, availableWidth)
+        m_capacityFreeText.setText(tileMetrics.horizontalAdvance(freeText) > availableWidth
+                                   ? tileMetrics.elidedText(freeText, Qt::ElideRight, availableWidth)
                                    : freeText);
         m_capacityFreeTextPos = QPointF(x, y);
     }

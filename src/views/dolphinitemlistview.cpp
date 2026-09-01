@@ -264,8 +264,13 @@ void DolphinItemListView::updateGridSize()
                name, the capacity bar and the free-space line have less room
                than they need and start colliding with each other. */
             effectiveIconSize = qMax(iconSize, 48);
-            const int barWidth  = 220;
-            const int textBlock = 3 * option.fontMetrics.lineSpacing();
+            /* The cell has to grow with the zoom too, or the icon gets bigger
+               while the bar and the text stay the size they were and the tile
+               stops looking like one thing. Same scale the widget uses for the
+               tile fonts. */
+            const qreal tileScale = KStandardItemListWidget::exxosTileScale(effectiveIconSize);
+            const int barWidth  = qRound(220 * tileScale);
+            const int textBlock = qRound(3 * option.fontMetrics.lineSpacing() * tileScale);
             itemWidth  = padding * 4 + effectiveIconSize + barWidth;
             itemHeight = padding * 3 + qMax(effectiveIconSize, textBlock);
             horizontalMargin = 8;
@@ -306,7 +311,8 @@ void DolphinItemListView::updateGridSize()
         tileLayout = viewHasCapacityItems();
         if (tileLayout) {
             effectiveIconSize = qMax(iconSize, 48);
-            const int textBlock = 3 * option.fontMetrics.lineSpacing();
+            const qreal tileScale = KStandardItemListWidget::exxosTileScale(effectiveIconSize);
+            const int textBlock = qRound(3 * option.fontMetrics.lineSpacing() * tileScale);
             itemHeight = padding * 2 + qMax(effectiveIconSize, textBlock);
         } else {
             itemHeight = padding * 2 + qMax(iconSize, option.fontMetrics.lineSpacing());
