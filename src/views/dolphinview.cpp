@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+#include <Solid/DeviceNotifier>
 #include "dolphinview.h"
 
 #include "dolphin_generalsettings.h"
@@ -174,6 +175,31 @@ DolphinView::DolphinView(const QUrl& url, QWidget* parent) :
     connect(controller, &KItemListController::decreaseZoom, this, &DolphinView::slotDecreaseZoom);
     connect(controller, &KItemListController::swipeUp, this, &DolphinView::slotSwipeUp);
     connect(controller, &KItemListController::selectionModeChangeRequested, this, &DolphinView::selectionModeChangeRequested);
+
+    /* Exxos/Win7: refresh computer:/ when the hardware changes.
+
+       The computer:/ worker is a one-shot process -- it lists and exits -- so
+       nothing is left watching to tell the view a disc has been inserted or
+       ejected. The Places panel updates because it listens to Solid directly;
+       the icon view did not, so inserting a CD showed its label in the panel
+       while the view still said "No disc" until it was navigated away from and
+       back.
+
+       Reload only while actually looking at computer:/, so this costs nothing
+       anywhere else. A disc appearing or going away is exactly a Solid device
+       add/remove. */
+    connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceAdded,
+            this, [this](const QString &) {
+                if (this->url().scheme() == QLatin1String("computer")) {
+                    reload();
+                }
+            });
+    connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceRemoved,
+            this, [this](const QString &) {
+                if (this->url().scheme() == QLatin1String("computer")) {
+                    reload();
+                }
+            });
 
     connect(m_model, &KFileItemModel::directoryLoadingStarted,       this, &DolphinView::slotDirectoryLoadingStarted);
     connect(m_model, &KFileItemModel::directoryLoadingCompleted,     this, &DolphinView::slotDirectoryLoadingCompleted);
