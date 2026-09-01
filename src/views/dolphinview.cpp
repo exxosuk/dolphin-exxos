@@ -592,14 +592,27 @@ void DolphinView::scheduleComputerReload()
     if (!m_computerReloadTimer) {
         m_computerReloadTimer = new QTimer(this);
         m_computerReloadTimer->setSingleShot(true);
-        m_computerReloadTimer->setInterval(1200);
         connect(m_computerReloadTimer, &QTimer::timeout, this, [this]() {
-            if (url().scheme() == QLatin1String("computer")) {
-                reload();
+            if (url().scheme() != QLatin1String("computer")) {
+                return;
+            }
+            reload();
+            /* Reload a second time, later.
+
+               One pass is not enough in either direction: on insertion the
+               volume may not have been probed yet, and on EJECT udisks can
+               take longer still to drop it -- ejecting left the view showing
+               the disc that was no longer there. Rather than guess a single
+               delay long enough for the slowest case and sluggish for the
+               rest, refresh promptly and then confirm. */
+            if (m_computerReloadPasses > 1) {
+                --m_computerReloadPasses;
+                m_computerReloadTimer->start(3000);
             }
         });
     }
-    m_computerReloadTimer->start();
+    m_computerReloadPasses = 2;
+    m_computerReloadTimer->start(1200);
 }
 
 void DolphinView::reload()

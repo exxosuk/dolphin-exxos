@@ -954,6 +954,7 @@ private:
     friend class DolphinPart;                   // Accesses m_model
 
     QTimer* m_computerReloadTimer = nullptr;   // Exxos/Win7
+    int m_computerReloadPasses = 0;            // Exxos/Win7
 };
 
 /// Allow using DolphinView::Mode in QVariant
