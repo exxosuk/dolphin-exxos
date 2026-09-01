@@ -335,8 +335,14 @@ void PlacesPanel::syncHardwarePlaces()
     for (int i = placesModel->rowCount() - 1; i >= 0; --i) {
         const QModelIndex idx = placesModel->index(i, 0);
         const QString u = placesModel->url(idx).toString();
-        if (!u.startsWith(QLatin1String("computer:/"))) {
-            continue;                       // not one of ours
+        /* ONLY entries this code generated.
+           Must not be a plain startsWith("computer:/") test: the user's own
+           "Computer" place IS computer:/ , and matching it deleted a bookmark
+           that was never ours to touch. Ours always address a specific bay, so
+           the path is a sanitised Solid UDI and begins with an underscore
+           (from the leading slash of /org/freedesktop/...). */
+        if (!u.startsWith(QLatin1String("computer:/_"))) {
+            continue;
         }
         const bool goneOrMounted = !liveBays.contains(u)
             || [&] {
