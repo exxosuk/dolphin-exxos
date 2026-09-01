@@ -130,6 +130,31 @@ void KStandardItemListWidgetInformant::calculateIconsLayoutItemSizeHints(QVector
     const int additionalRolesCount = qMax(view->visibleRoles().count() - 1, 0);
 
     const qreal itemWidth = view->itemSize().width();
+
+    /* Exxos/Win7: a tile is as tall as its CELL, not as tall as its text.
+
+       The heights computed below describe an icon with a caption underneath.
+       A tile is laid out sideways instead -- icon left, name / capacity bar /
+       free-space line stacked to its right -- so it needs the full cell
+       height that DolphinItemListView::updateGridSize() worked out.
+
+       Reporting the caption height here made every tile widget SHORTER than
+       its cell (244x40 inside a 244x60 cell), so the tile painted outside its
+       own bounds. The view only ever invalidates the rect a widget claims, so
+       those overspilling pixels were never cleared: zooming left a sliver of
+       each icon at its old position until something repainted the area by
+       other means -- passing the mouse over it, or resizing the window. */
+    if (option.tileLayout) {
+        const qreal tileHeight = view->itemSize().height();
+        for (int index = 0; index < logicalHeightHints.count(); ++index) {
+            if (logicalHeightHints.at(index).first <= 0.0) {
+                logicalHeightHints[index].first = tileHeight;
+                logicalHeightHints[index].second = false;   // never elided: one line, fixed width
+            }
+        }
+        logicalWidthHint = itemWidth;
+        return;
+    }
     const qreal maxWidth = itemWidth - 2 * option.padding;
     const qreal additionalRolesSpacing = additionalRolesCount * option.fontMetrics.lineSpacing();
     const qreal spacingAndIconHeight = option.iconSize + option.padding * 3;

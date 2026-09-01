@@ -227,6 +227,7 @@ void DolphinItemListView::updateGridSize()
     int maxTextLines = 0;
     int maxTextWidth = 0;
     bool tileLayout = false;   // Exxos/Win7 tile grid
+    int effectiveIconSize = iconSize;   // Exxos/Win7: a tile row enforces a floor
 
     switch (itemLayout()) {
     case KFileItemListView::IconsLayout: {
@@ -286,7 +287,23 @@ void DolphinItemListView::updateGridSize()
     }
     case KFileItemListView::DetailsLayout: {
         itemWidth = -1;
-        itemHeight = padding * 2 + qMax(iconSize, option.fontMetrics.lineSpacing());
+        /* Exxos/Win7: a capacity row is a tile here too -- name, capacity bar
+           and free-space line stacked beside the icon. An ordinary details row
+           only has to fit ONE line, so its height follows the icon; below a
+           48px icon that leaves the three stacked lines less room than they
+           need and the free-space text rides up over the bar and the name.
+
+           So a tile row keeps a 48px floor under the icon AND is tall enough
+           for three lines, whichever is larger. Ordinary rows are untouched,
+           and can still be made as small as the user likes. */
+        tileLayout = viewHasCapacityItems();
+        if (tileLayout) {
+            effectiveIconSize = qMax(iconSize, 48);
+            const int textBlock = 3 * option.fontMetrics.lineSpacing();
+            itemHeight = padding * 2 + qMax(effectiveIconSize, textBlock);
+        } else {
+            itemHeight = padding * 2 + qMax(iconSize, option.fontMetrics.lineSpacing());
+        }
         break;
     }
     default:
@@ -300,7 +317,7 @@ void DolphinItemListView::updateGridSize()
     option.padding = padding;
     option.horizontalMargin = horizontalMargin;
     option.verticalMargin = verticalMargin;
-    option.iconSize = iconSize;
+    option.iconSize = effectiveIconSize;
     option.maxTextLines = maxTextLines;
     option.maxTextWidth = maxTextWidth;
     option.tileLayout = tileLayout;
