@@ -27,9 +27,12 @@
 #include <KAboutData>
 
 /* Version of the Exxos Edition patch set itself, independent of the Dolphin
-   base version it is applied to. Bump this when the patch changes; leave it
-   alone when merely rebasing onto a newer Dolphin. */
-#define EXXOS_EDITION_VERSION "1.1"
+   base version it is applied to.
+
+   Generated from theme-work/VERSION by bump-version.sh, so the title bar, the
+   .deb and the git tag cannot drift apart -- which is the usual way version
+   numbers stop being worth reading. Do not hardcode it here again. */
+#include "exxosversion.h"
 #include <KCrash>
 #include <KDBusService>
 #include <KLocalizedString>
