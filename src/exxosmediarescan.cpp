@@ -10,6 +10,8 @@
 #include <QDBusMessage>
 #include <QDBusPendingCall>
 #include <QDir>
+#include <Solid/Device>
+#include <Solid/StorageDrive>
 #include <QFile>
 #include <QVariantMap>
 
@@ -192,19 +194,48 @@ void ExxosBusySpinner::setBusy(const QString &udi, bool busy)
     updateTimer(had);
 }
 
-void ExxosBusySpinner::setGlobalBusy(bool busy)
+void ExxosBusySpinner::setDriveBusy(const QString &anyUdi, bool busy)
 {
-    if (m_globalBusy == busy) {
+    setBusy(driveOf(anyUdi), busy);
+}
+
+void ExxosBusySpinner::clearAll()
+{
+    if (m_busy.isEmpty()) {
         return;
     }
     const bool had = anyBusy();
-    m_globalBusy = busy;
+    m_busy.clear();
     updateTimer(had);
+}
+
+/* Walk up to the StorageDrive, so a volume and the bay it sits in resolve to
+   the same thing. Cached: UDIs are stable, this is called from painting, and
+   Solid lookups are not free. */
+QString ExxosBusySpinner::driveOf(const QString &udi) const
+{
+    if (udi.isEmpty()) {
+        return QString();
+    }
+    const auto it = m_driveOf.constFind(udi);
+    if (it != m_driveOf.constEnd()) {
+        return *it;
+    }
+    Solid::Device dev(udi);
+    for (int depth = 0; dev.isValid() && depth < 8; ++depth) {
+        if (dev.is<Solid::StorageDrive>()) {
+            break;
+        }
+        dev = dev.parent();
+    }
+    const QString drive = dev.isValid() ? dev.udi() : udi;
+    m_driveOf.insert(udi, drive);
+    return drive;
 }
 
 bool ExxosBusySpinner::anyBusy() const
 {
-    return m_globalBusy || !m_busy.isEmpty();
+    return !m_busy.isEmpty();
 }
 
 void ExxosBusySpinner::updateTimer(bool wasBusy)
@@ -221,8 +252,8 @@ void ExxosBusySpinner::updateTimer(bool wasBusy)
 
 bool ExxosBusySpinner::isBusy(const QString &udi) const
 {
-    if (udi.isEmpty()) {
+    if (udi.isEmpty() || m_busy.isEmpty()) {
         return false;                  // not a drive: the Network shortcut, say
     }
-    return m_globalBusy || m_busy.contains(udi);
+    return m_busy.contains(driveOf(udi));
 }

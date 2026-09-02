@@ -126,15 +126,18 @@ public:
     bool isBusy(const QString &udi) const;
 
     /**
-     * Mark EVERY drive busy, for the common case where a device event has
-     * happened and which tile it belongs to is not knowable in advance.
+     * Mark the PHYSICAL DRIVE that @p anyUdi belongs to.
      *
-     * Ejecting a disc is the clear example: the event names the volume that
-     * has gone, while the tile that appears in its place is the empty bay --
-     * a different device with a different UDI, so marking the one we were
-     * told about would spin nothing. A refresh touches every drive anyway.
+     * Volume UDIs and bay UDIs are different things -- eject a disc and the
+     * tile that replaces it is the empty bay, a different device entirely --
+     * so both are resolved up to the drive they sit on and matched there.
+     * The drive keeps spinning across the change instead of the spinner
+     * jumping to nothing, and the drives nobody touched stay still.
      */
-    void setGlobalBusy(bool busy);
+    void setDriveBusy(const QString &anyUdi, bool busy);
+
+    /** Stop every spinner: the listing has been redrawn. */
+    void clearAll();
 
     /** Advances while anything is busy; the angle of the spinner. */
     int phase() const { return m_phase; }
@@ -146,10 +149,11 @@ Q_SIGNALS:
 private:
     explicit ExxosBusySpinner(QObject *parent = nullptr);
     bool anyBusy() const;
+    QString driveOf(const QString &udi) const;
     void updateTimer(bool wasBusy);
 
-    QSet<QString> m_busy;
-    bool m_globalBusy = false;
+    QSet<QString> m_busy;          // drive UDIs
+    mutable QHash<QString, QString> m_driveOf;   // any UDI -> its drive
     int m_phase = 0;
     class QTimer *m_timer = nullptr;
 };

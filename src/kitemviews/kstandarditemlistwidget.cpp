@@ -8,6 +8,7 @@
 
 #include "exxosmediarescan.h"
 
+#include <QConicalGradient>
 #include <cmath>
 
 #include <KIO/Global>          // KIO::convertSize, for the tile view free-space text
@@ -323,38 +324,56 @@ QString KStandardItemListWidget::exxosDeviceUdi() const
     return data().value("deviceUdi").toString();
 }
 
-/* A small ring of fading dots over the icon, turning while the drive is read.
+/* The Windows 7 "working" ring: a blue circle whose brightness sweeps round it.
 
-   Explorer puts a spinner on the item it is working on rather than only in the
-   status bar, which answers "is it doing anything?" and "to what?" at once.
-   Drawn over the icon, sized to it, so it cannot collide with the text. */
+   Explorer marks the item it is working on rather than only the status bar,
+   which answers "is it doing anything?" and "to what?" at once.
+
+   Drawn as ONE stroked circle with a conical gradient along the pen, so the
+   leading edge is solid and it fades to nothing behind -- that is what gives
+   Win7's ring its sense of direction. Eight discrete dots was the first
+   attempt and reads as a much older, chunkier spinner.
+
+   Half the icon's width, so it marks the drive without hiding it. */
 void KStandardItemListWidget::exxosDrawBusySpinner(QPainter* painter) const
 {
     const QRectF icon(m_pixmapPos, QSizeF(m_scaledPixmapSize));
     if (icon.isEmpty()) {
         return;
     }
-    const qreal radius = qMin(icon.width(), icon.height()) * 0.30;
+    const qreal diameter = qMin(icon.width(), icon.height()) * 0.5;
+    if (diameter < 8) {
+        return;                     // too small to read as anything but a blob
+    }
     const QPointF centre = icon.center();
-    const qreal dotR = qMax(qreal(1.2), radius * 0.20);
+    const qreal radius = diameter / 2.0;
+    const qreal thickness = qMax(qreal(2.0), diameter * 0.16);
     const int phase = ExxosBusySpinner::instance()->phase();
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setPen(Qt::NoPen);
-    /* A disc behind it, so the dots stay legible over a busy icon. */
-    painter->setBrush(QColor(255, 255, 255, 190));
-    painter->drawEllipse(centre, radius + dotR * 1.6, radius + dotR * 1.6);
 
-    for (int i = 0; i < 8; ++i) {
-        const qreal angle = (i * 45.0 - phase * 30.0) * M_PI / 180.0;
-        const QPointF p(centre.x() + radius * std::cos(angle),
-                        centre.y() + radius * std::sin(angle));
-        // Brightest at the leading dot, fading round the ring.
-        const int alpha = 40 + (215 * (7 - i)) / 7;
-        painter->setBrush(QColor(15, 136, 165, alpha));
-        painter->drawEllipse(p, dotR, dotR);
-    }
+    /* A soft light disc behind it: over a dark or busy icon the ring loses its
+       tail, and the tail is the part that shows it is moving. */
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(QColor(255, 255, 255, 150));
+    painter->drawEllipse(centre, radius + thickness, radius + thickness);
+
+    /* Win7's blue. The gradient runs out before it comes back round, leaving a
+       gap: without it the two ends meet and the ring looks static. */
+    const qreal degrees = -phase * (360.0 / 12.0);
+    QConicalGradient gradient(centre, degrees);
+    gradient.setColorAt(0.00, QColor(31, 148, 224, 255));
+    gradient.setColorAt(0.55, QColor(31, 148, 224, 90));
+    gradient.setColorAt(0.85, QColor(31, 148, 224, 0));
+    gradient.setColorAt(1.00, QColor(31, 148, 224, 255));
+
+    QPen pen(QBrush(gradient), thickness);
+    pen.setCapStyle(Qt::RoundCap);
+    painter->setPen(pen);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawEllipse(centre, radius, radius);
+
     painter->restore();
 }
 

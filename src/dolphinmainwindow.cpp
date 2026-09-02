@@ -261,7 +261,12 @@ DolphinMainWindow::DolphinMainWindow() :
            that needs to show progress is not necessarily that one -- eject a
            disc and the tile that takes its place is the empty BAY, a different
            device entirely. A refresh re-reads them all in any case. */
-        ExxosBusySpinner::instance()->setGlobalBusy(true);
+        ExxosBusySpinner::instance()->setDriveBusy(
+            QStringLiteral("/org/freedesktop/UDisks2/block_devices/") + device, true);
+        /* A swapped disk must be mounted again: the volume's UDI does not
+           change when the medium does, so the "tried once" record would stop
+           it ever being attempted for the new disk. */
+        m_exxosMountAttempted.clear();
 
         if (m_activeViewContainer) {
             m_activeViewContainer->statusBar()->exxosShowBusy(
@@ -278,16 +283,18 @@ DolphinMainWindow::DolphinMainWindow() :
        size change, so those events have to raise the spinner too -- otherwise
        it appeared for the floppy and for nothing else. */
     connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceAdded,
-            this, [this](const QString &) {
-        ExxosBusySpinner::instance()->setGlobalBusy(true);
+            this, [this](const QString &udi) {
+        ExxosBusySpinner::instance()->setDriveBusy(udi, true);
         if (m_activeViewContainer) {
             m_activeViewContainer->statusBar()->exxosShowBusy(
                 i18nc("@info:progress", "Reading disc..."), 2000);
         }
     });
     connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceRemoved,
-            this, [this](const QString &) {
-        ExxosBusySpinner::instance()->setGlobalBusy(true);
+            this, [this](const QString &udi) {
+        /* Resolve BEFORE the device is gone, while Solid can still say which
+           drive it sat in -- afterwards the parent chain is unavailable. */
+        ExxosBusySpinner::instance()->setDriveBusy(udi, true);
         if (m_activeViewContainer) {
             m_activeViewContainer->statusBar()->exxosShowBusy(
                 i18nc("@info:progress", "Checking drives..."), 2000);
@@ -300,7 +307,7 @@ DolphinMainWindow::DolphinMainWindow() :
     auto *spinCap = new QTimer(this);
     spinCap->setInterval(30000);
     connect(spinCap, &QTimer::timeout, this, []() {
-        ExxosBusySpinner::instance()->setGlobalBusy(false);
+        ExxosBusySpinner::instance()->clearAll();
     });
     spinCap->start();
 
@@ -324,14 +331,14 @@ DolphinMainWindow::DolphinMainWindow() :
             const auto devices = Solid::Device::listFromType(
                 Solid::DeviceInterface::StorageAccess, QString());
             for (const Solid::Device &dev : devices) {
-                ExxosBusySpinner::instance()->setBusy(dev.udi(), true);
+                ExxosBusySpinner::instance()->setDriveBusy(dev.udi(), true);
             }
         });
         QTimer::singleShot(22500, this, []() {
             const auto devices = Solid::Device::listFromType(
                 Solid::DeviceInterface::StorageAccess, QString());
             for (const Solid::Device &dev : devices) {
-                ExxosBusySpinner::instance()->setBusy(dev.udi(), false);
+                ExxosBusySpinner::instance()->setDriveBusy(dev.udi(), false);
             }
         });
     }

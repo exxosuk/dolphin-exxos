@@ -717,7 +717,7 @@ void DolphinViewContainer::slotDirectoryLoadingCompleted()
        spinners. Tying it to the listing rather than to a timer is the whole
        point -- a floppy can take several seconds longer than any guess. */
     if (url().scheme() == QLatin1String("computer")) {
-        ExxosBusySpinner::instance()->setGlobalBusy(false);
+        ExxosBusySpinner::instance()->clearAll();
     }
 
     if (!m_statusBar->progressText().isEmpty()) {

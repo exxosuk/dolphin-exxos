@@ -91,7 +91,13 @@ fi
 POLL_RULE=/etc/udev/rules.d/61-exxos-removable-polling.rules
 POLL_ASKED="$HOME/.config/exxos-media-polling-declined"
 
-if [ -z "$EXXOS_SKIP_POLL_CHECK" ] && [ ! -f "$POLL_RULE" ] && [ ! -f "$POLL_ASKED" ] \
+SHIPPED_RULE="$HERE/../system-tools/61-exxos-removable-polling.rules"
+# Offer when the rule is missing OR when the shipped one has CHANGED. The
+# poll interval has already been retuned once -- a floppy seeks to answer
+# the kernel's check, and every two seconds was audible -- and an
+# out-of-date copy would quietly keep the old behaviour.
+if [ -z "$EXXOS_SKIP_POLL_CHECK" ] && [ -f "$SHIPPED_RULE" ] \
+   && ! cmp -s "$SHIPPED_RULE" "$POLL_RULE" && [ ! -f "$POLL_ASKED" ] \
    && [ -x "$HERE/../system-tools/install-media-polling.sh" ]; then
     unpolled=""
     for d in /sys/block/sd[a-z] /sys/block/mmcblk[0-9]; do
@@ -101,6 +107,8 @@ if [ -z "$EXXOS_SKIP_POLL_CHECK" ] && [ ! -f "$POLL_RULE" ] && [ ! -f "$POLL_ASK
             -1|"") unpolled="$unpolled $(basename "$d")" ;;
         esac
     done
+    # An existing rule with a different interval also wants offering.
+    [ -f "$POLL_RULE" ] && unpolled="${unpolled:- (interval changed)}"
     # In the BACKGROUND: kdialog blocks until it is answered, and Dolphin must
     # not wait on a question nobody is at the machine to read.
     if [ -n "$unpolled" ] && command -v kdialog >/dev/null; then
@@ -112,6 +120,10 @@ $unpolled
 A disk or card put into one of them will not be noticed until something
 else happens - the drive never announces it, and nothing is asking.
 The CD/DVD drive works only because it IS asked.
+
+The check runs every 5 seconds. A floppy drive moves its head to answer,
+so if the clicking bothers you, run this afterwards with a larger number:
+  sudo system-tools/install-media-polling.sh --interval 15000
 
 This installs one udev rule so the kernel checks them too. It asks the
 drive whether the medium changed; it does not read the disk, so an idle
