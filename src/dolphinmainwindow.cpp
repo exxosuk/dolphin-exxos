@@ -1792,6 +1792,31 @@ void DolphinMainWindow::exxosMountRemovableVolumes()
             continue;
         }
         m_exxosMountAttempted.insert(dev.udi());
+
+        /* Keep the drive spinning until the mount finishes. The listing that
+           triggered this showed it unmounted and has already completed, so
+           without pinning the spinner stopped while a floppy was still
+           audibly working -- which is exactly the question it is there to
+           answer. Released either way, then the view is re-listed so the
+           label and free space appear. */
+        const QString udi = dev.udi();
+        ExxosBusySpinner::instance()->setDrivePinned(udi, true);
+        /* Push any pending refresh out of the way. Redrawing now would show
+           the drive unmounted, with no label and no free space, and we would
+           have to redraw again the moment the mount finished -- which is the
+           unnecessary refresh the user was seeing. */
+        if (m_activeViewContainer) {
+            m_activeViewContainer->view()->scheduleComputerReload(9000);
+        }
+        connect(access, &Solid::StorageAccess::setupDone, this,
+                [this, udi](Solid::ErrorType, QVariant, const QString &) {
+                    ExxosBusySpinner::instance()->setDrivePinned(udi, false);
+                    if (m_activeViewContainer) {
+                        // Now there is something new to show.
+                        m_activeViewContainer->view()->scheduleComputerReload(600);
+                    }
+                }, Qt::UniqueConnection);
+
         access->setup();   // asynchronous; udisks does the work
     }
 }
@@ -2088,7 +2113,7 @@ void DolphinMainWindow::setupActions()
                 if (!KSharedConfig::openConfig()->group("Exxos").readEntry("AutoMountRemovable", false)) {
                     return;
                 }
-                QTimer::singleShot(1200, this, [this]() { exxosMountRemovableVolumes(); });
+                QTimer::singleShot(700, this, [this]() { exxosMountRemovableVolumes(); });
             });
 
     KToggleAction* editableLocation = actionCollection()->add<KToggleAction>(QStringLiteral("editable_location"));

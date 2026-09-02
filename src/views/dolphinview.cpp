@@ -585,7 +585,7 @@ void DolphinView::exxosWatchAccessibility(const QString &udi)
     }
 }
 
-void DolphinView::scheduleComputerReload()
+void DolphinView::scheduleComputerReload(int delayMs)
 {
     if (url().scheme() != QLatin1String("computer")) {
         return;
@@ -615,7 +615,12 @@ void DolphinView::scheduleComputerReload()
        its parent, the access state -- and restarting the timer each time is
        what keeps them to a single refresh. */
     m_computerReloadPasses = 1;
-    m_computerReloadTimer->start(1400);
+    /* Restarting rather than stacking is what collapses the several signals
+       one physical change produces into a single refresh -- and it is also
+       how a pending refresh gets POSTPONED while a mount is in progress, so
+       the view is redrawn once, with the label and free space already there,
+       instead of once without them and again with. */
+    m_computerReloadTimer->start(delayMs);
 }
 
 void DolphinView::reload()

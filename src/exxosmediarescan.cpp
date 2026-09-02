@@ -209,6 +209,21 @@ void ExxosBusySpinner::clearAll()
     updateTimer(had);
 }
 
+void ExxosBusySpinner::setDrivePinned(const QString &anyUdi, bool pinned)
+{
+    const QString drive = driveOf(anyUdi);
+    if (drive.isEmpty()) {
+        return;
+    }
+    const bool had = anyBusy();
+    if (pinned) {
+        m_pinned.insert(drive);
+    } else {
+        m_pinned.remove(drive);
+    }
+    updateTimer(had);
+}
+
 /* Walk up to the StorageDrive, so a volume and the bay it sits in resolve to
    the same thing. Cached: UDIs are stable, this is called from painting, and
    Solid lookups are not free. */
@@ -235,7 +250,7 @@ QString ExxosBusySpinner::driveOf(const QString &udi) const
 
 bool ExxosBusySpinner::anyBusy() const
 {
-    return !m_busy.isEmpty();
+    return !m_busy.isEmpty() || !m_pinned.isEmpty();
 }
 
 void ExxosBusySpinner::updateTimer(bool wasBusy)
@@ -252,8 +267,9 @@ void ExxosBusySpinner::updateTimer(bool wasBusy)
 
 bool ExxosBusySpinner::isBusy(const QString &udi) const
 {
-    if (udi.isEmpty() || m_busy.isEmpty()) {
+    if (udi.isEmpty() || (m_busy.isEmpty() && m_pinned.isEmpty())) {
         return false;                  // not a drive: the Network shortcut, say
     }
-    return m_busy.contains(driveOf(udi));
+    const QString drive = driveOf(udi);
+    return m_busy.contains(drive) || m_pinned.contains(drive);
 }

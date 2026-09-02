@@ -136,8 +136,19 @@ public:
      */
     void setDriveBusy(const QString &anyUdi, bool busy);
 
-    /** Stop every spinner: the listing has been redrawn. */
+    /** Stop every spinner: the listing has been redrawn. Pinned drives keep
+     *  spinning -- see setDrivePinned(). */
     void clearAll();
+
+    /**
+     * Keep a drive spinning through work the listing does not cover.
+     *
+     * Mounting happens AFTER the listing that showed the drive unmounted, and
+     * on a floppy it takes several seconds. Without this the spinner stopped
+     * while the drive was still audibly working, which is precisely the thing
+     * the spinner exists to answer.
+     */
+    void setDrivePinned(const QString &anyUdi, bool pinned);
 
     /** Advances while anything is busy; the angle of the spinner. */
     int phase() const { return m_phase; }
@@ -153,6 +164,7 @@ private:
     void updateTimer(bool wasBusy);
 
     QSet<QString> m_busy;          // drive UDIs
+    QSet<QString> m_pinned;        // busy until explicitly released
     mutable QHash<QString, QString> m_driveOf;   // any UDI -> its drive
     int m_phase = 0;
     class QTimer *m_timer = nullptr;
