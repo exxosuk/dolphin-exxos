@@ -20,53 +20,61 @@ if [ ! -x "$BIN" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# The computer:/ worker has to match the binary.
+# The computer:/ worker, kept current with NO root and no terminal step.
 #
-# It lives in a root-owned plugin directory, so it cannot be updated by the
-# same build step that produces Dolphin, and three separate sessions have now
-# been spent testing device behaviour against a worker that was months out of
-# date -- every result read as "the fix did not work". The build and the
-# installed plugin are compared here, and the user is asked once, rather than
-# leaving a silent mismatch that looks exactly like a bug.
+# KIO spawns a worker as `kioslave5 <absolute path to the .so> computer ...`,
+# and the path is resolved through the Qt plugin path of the process that
+# spawns it. Setting QT_PLUGIN_PATH here is therefore enough for our Dolphin to
+# load a worker out of the user's own home -- verified: the spawned process ran
 #
-# Declining is fine: Dolphin starts either way, just with the old worker.
-# EXXOS_SKIP_WORKER_CHECK=1 skips this entirely.
+#   /home/chris/.local/lib/qt5/plugins/kf5/kio/computer.so
+#
+# So the root-owned copy under /usr/lib is no longer needed for this build. It
+# is left alone (install.sh still maintains it) only so that OTHER
+# applications' computer:/ listings match; nothing here depends on it.
+#
+# Three sessions were spent testing device behaviour against a worker that was
+# out of date, because updating it needed a password and a terminal. Now the
+# build is copied into place on every start and the mismatch cannot happen.
 # ---------------------------------------------------------------------------
 WORKER_SRC="$HERE/../kio-computer/computer.so"
-WORKER_DST=/usr/lib/x86_64-linux-gnu/qt5/plugins/kf5/kio/computer.so
+WORKER_DIR="$HOME/.local/lib/qt5/plugins/kf5/kio"
+WORKER_DST="$WORKER_DIR/computer.so"
 
-if [ -z "$EXXOS_SKIP_WORKER_CHECK" ] && [ -f "$WORKER_SRC" ] \
-   && ! cmp -s "$WORKER_SRC" "$WORKER_DST"; then
-    MSG="The computer:/ drive worker is out of date.
-
-Built:     $(date -r "$WORKER_SRC" '+%d %b %H:%M')
-Installed: $([ -f "$WORKER_DST" ] && date -r "$WORKER_DST" '+%d %b %H:%M' || echo 'not installed')
-
-Drive detection - discs, cards and removable media appearing and
-disappearing - will behave as it did in the older version until this
-is updated. Administrator access is needed to replace it.
-
-Update it now?"
-    if command -v kdialog >/dev/null \
-       && kdialog --title "Dolphin Exxos Edition" --yesno "$MSG" 2>/dev/null; then
-        if pkexec /usr/bin/install -m 644 -o root -g root "$WORKER_SRC" "$WORKER_DST"; then
-            # A worker already running holds the OLD code in memory and is
-            # reused from the pool for minutes, so replacing the file is not
-            # enough on its own.
-            pkill -x kioslave5 2>/dev/null
-            kbuildsycoca5 --noincremental >/dev/null 2>&1
-            kdialog --title "Dolphin Exxos Edition" \
-                    --passivepopup "Drive worker updated." 5 2>/dev/null &
-        else
-            kdialog --title "Dolphin Exxos Edition" \
-                    --error "The drive worker could not be updated.
-
-Run this in a terminal instead:
-  sudo $HERE/../kio-computer/install.sh" 2>/dev/null &
-        fi
-    else
-        echo "computer:/ worker is stale; run: sudo $HERE/../kio-computer/install.sh" >&2
+if [ -f "$WORKER_SRC" ]; then
+    mkdir -p "$WORKER_DIR"
+    if ! cmp -s "$WORKER_SRC" "$WORKER_DST"; then
+        cp -f "$WORKER_SRC" "$WORKER_DST.new" && mv -f "$WORKER_DST.new" "$WORKER_DST"
     fi
+    # The .protocol file is what makes computer:/ a known scheme at all.
+    if [ -f "$HERE/../kio-computer/computer.protocol" ]; then
+        mkdir -p "$HOME/.local/share/kservices5"
+        cmp -s "$HERE/../kio-computer/computer.protocol" \
+               "$HOME/.local/share/kservices5/computer.protocol" || {
+            cp -f "$HERE/../kio-computer/computer.protocol" \
+                  "$HOME/.local/share/kservices5/computer.protocol"
+            kbuildsycoca5 --noincremental >/dev/null 2>&1
+        }
+    fi
+
+    # A worker started BEFORE the current .so was written is running the old
+    # code from memory, and KIO keeps idle workers around to hand to the next
+    # client -- so replacing the file is not enough on its own. Anything older
+    # than the plugin is retired; a live one just respawns on the next request.
+    if [ -f "$WORKER_DST" ]; then
+        so_time=$(stat -c %Y "$WORKER_DST" 2>/dev/null || echo 0)
+        for pid in $(pgrep -x kioslave5 2>/dev/null); do
+            case "$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)" in
+                *computer.so*)
+                    started=$(stat -c %Y "/proc/$pid" 2>/dev/null || echo 0)
+                    [ "$started" -lt "$so_time" ] && kill "$pid" 2>/dev/null
+                    ;;
+            esac
+        done
+    fi
+
+    QT_PLUGIN_PATH="$HOME/.local/lib/qt5/plugins${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
+    export QT_PLUGIN_PATH
 fi
 
 exec "$BIN" "$@"
