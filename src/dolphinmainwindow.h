@@ -42,6 +42,7 @@ class KNewFileMenu;
 class KToolBarPopupAction;
 class QToolButton;
 class PlacesPanel;
+class ExxosNetworkDiscovery;
 class TerminalPanel;
 
 namespace KIO {
@@ -616,6 +617,8 @@ private:
     /* Exxos/Win7: auto-mount removable media, and the toggle behind it. */
     void slotToggleAutoMount(bool enabled);
     void exxosMountRemovableVolumes();
+    /** Exxos: probe the network and refresh the Network entries. */
+    void exxosScanNetwork();
 
     void setupActions();
 
@@ -709,6 +712,8 @@ private:
 
     TerminalPanel* m_terminalPanel;
     PlacesPanel* m_placesPanel;
+    /* Exxos: populates Network with the machines on this subnet. */
+    ExxosNetworkDiscovery* m_networkDiscovery;
     bool m_tearDownFromPlacesRequested;
 
     KToolBarPopupAction* m_backAction;

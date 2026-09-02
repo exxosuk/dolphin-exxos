@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!DOCTYPE gui SYSTEM "kpartgui.dtd">
-<gui name="dolphin" version="40">
+<gui name="dolphin" version="41">
     <MenuBar>
         <Menu name="file">
             <Action name="new_menu" />
@@ -69,6 +69,7 @@
                  here rather than under View because it is a setting, not a way
                  of looking at the current folder. -->
             <Action name="exxos_auto_mount" />
+            <Action name="exxos_scan_network" />
         </Menu>
         <Menu name="go">
             <Action name="bookmarks" />

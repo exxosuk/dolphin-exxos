@@ -258,6 +258,7 @@ target_sources(dolphinstatic PRIVATE
     dolphinbookmarkhandler.cpp
     dolphindockwidget.cpp
     dolphinmainwindow.cpp
+    exxosnetworkdiscovery.cpp
     dolphinviewcontainer.cpp
     dolphincontextmenu.cpp
     dolphinnavigatorswidgetaction.cpp
@@ -426,6 +427,7 @@ target_sources(dolphinstatic PRIVATE
 target_include_directories(dolphinstatic SYSTEM PRIVATE ${PHONON_INCLUDES})
 target_link_libraries(dolphinstatic
     dolphinprivate
+    Qt${QT_MAJOR_VERSION}::Network
     KF5::CoreAddons
     KF5::KCMUtils
     KF5::DBusAddons

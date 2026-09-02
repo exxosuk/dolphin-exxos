@@ -45,6 +45,7 @@ ecm_setup_version("5.0.0" VARIABLE_PREFIX DOLPHINPRIVATE
 find_package(Qt${QT_MAJOR_VERSION} ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS
     Core
     Concurrent
+    Network
     Widgets
     Gui
     DBus

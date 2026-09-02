@@ -19,6 +19,7 @@
 #include "dolphinplacesmodelsingleton.h"
 #include "dolphinurlnavigatorscontroller.h"
 #include "dolphinviewcontainer.h"
+#include "exxosnetworkdiscovery.h"
 #include "dolphintabpage.h"
 #include "middleclickactioneventfilter.h"
 #include "panels/folders/folderspanel.h"
@@ -119,6 +120,7 @@ DolphinMainWindow::DolphinMainWindow() :
     m_lastHandleUrlOpenJob(nullptr),
     m_terminalPanel(nullptr),
     m_placesPanel(nullptr),
+    m_networkDiscovery(nullptr),
     m_tearDownFromPlacesRequested(false),
     m_backAction(nullptr),
     m_forwardAction(nullptr)
@@ -200,6 +202,11 @@ DolphinMainWindow::DolphinMainWindow() :
     const bool showMenu = !menuBar()->isHidden();
     QAction* showMenuBarAction = actionCollection()->action(KStandardAction::name(KStandardAction::ShowMenubar));
     showMenuBarAction->setChecked(showMenu);  // workaround for bug #171080
+
+    /* Exxos/Win7: populate Network in the background, so it is already filled
+       in by the time anyone clicks it. Deferred rather than immediate: the
+       probe is harmless but start-up should not wait on the network. */
+    QTimer::singleShot(2500, this, &DolphinMainWindow::exxosScanNetwork);
 
     auto hamburgerMenu = static_cast<KHamburgerMenu *>(actionCollection()->action(
                                     KStandardAction::name(KStandardAction::HamburgerMenu)));
@@ -1589,6 +1596,31 @@ void DolphinMainWindow::slotToggleAutoMount(bool enabled)
     }
 }
 
+/* Exxos/Win7: probe the network and refresh the Network entries.
+
+   Runs on a timer shortly after start-up as well, so Network is already
+   populated by the time anyone clicks it. See ExxosNetworkDiscovery. */
+void DolphinMainWindow::exxosScanNetwork()
+{
+    if (!m_networkDiscovery) {
+        m_networkDiscovery = new ExxosNetworkDiscovery(this);
+        connect(m_networkDiscovery, &ExxosNetworkDiscovery::finished, this, [this](int count) {
+            if (count <= 0) {
+                return;
+            }
+            /* Only reload if the user is actually looking at the network, so a
+               background sweep never disturbs what they are doing. */
+            const QUrl url = m_activeViewContainer ? m_activeViewContainer->url() : QUrl();
+            const QString scheme = url.scheme();
+            if (scheme == QLatin1String("remote") || scheme == QLatin1String("smb")
+                || scheme == QLatin1String("network")) {
+                m_activeViewContainer->view()->reload();
+            }
+        });
+    }
+    m_networkDiscovery->scan();
+}
+
 /* Mount every removable volume that is not mounted yet. Called when the
    setting is switched on and whenever a device appears while it is on. */
 void DolphinMainWindow::exxosMountRemovableVolumes()
@@ -1834,6 +1866,23 @@ void DolphinMainWindow::setupActions()
 
        Off by default and warns on first enable, because it IS a real
        relaxation -- see the message text. */
+    /* Exxos/Win7: "Scan for Network Devices".
+
+       The counterpart to the drive scan in computer:/. Dolphin's own SMB
+       browsing comes up empty on a stock Debian/MX install -- see
+       ExxosNetworkDiscovery for why -- and when a network view is empty there
+       is otherwise no way to tell "nothing is there" from "the lookup failed".
+       This asks, and says what it found. */
+    QAction* scanNetwork = actionCollection()->addAction(QStringLiteral("exxos_scan_network"));
+    scanNetwork->setText(i18nc("@action:inmenu Settings", "Scan for Network Devices"));
+    scanNetwork->setIcon(QIcon::fromTheme(QStringLiteral("network-workgroup")));
+    scanNetwork->setWhatsThis(xi18nc("@info:whatsthis",
+        "Looks for file servers on this network and lists them under "
+        "<emphasis>Network</emphasis>.<nl/><nl/>"
+        "This runs by itself when Dolphin starts. Use it after switching a "
+        "machine on, or after joining a different network."));
+    connect(scanNetwork, &QAction::triggered, this, &DolphinMainWindow::exxosScanNetwork);
+
     KToggleAction* autoMount = actionCollection()->add<KToggleAction>(QStringLiteral("exxos_auto_mount"));
     autoMount->setText(i18nc("@action:inmenu Settings", "Automatically Mount Removable Media"));
     autoMount->setWhatsThis(xi18nc("@info:whatsthis",
