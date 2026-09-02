@@ -713,6 +713,10 @@ private:
 private:
     bool m_enabledSelectionToggles;
     bool m_grouped;
+    /* Exxos/Win7: an icon-size change is outstanding, so keep animating
+       the icons even through a layout pass that skips animation. See
+       setStyleOption() and doLayout(). */
+    bool m_exxosIconResizePending = false;
     bool m_highlightEntireRow;
     bool m_alternateBackgrounds;
     bool m_supportsItemExpanding;

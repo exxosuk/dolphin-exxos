@@ -130,6 +130,14 @@ private:
 
     DolphinRemoveAction* m_removeAction; // Action that represents either 'Move To Trash' or 'Delete'
     void addDirectoryItemContextMenu();
+
+    /**
+     * Exxos/Win7: Mount / Unmount / Eject for a device row in computer:/.
+     *
+     * Returns true if the clicked item was such a device, in which case the
+     * actions (and a separator) have been added at the top of the menu.
+     */
+    bool addComputerDeviceActions();
     KFileItemActions *m_fileItemActions;
 
 };

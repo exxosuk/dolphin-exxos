@@ -31,6 +31,12 @@
 #include <KStandardAction>
 #include <kio_version.h>
 
+#include <KIO/UDSEntry>
+
+#include <Solid/Device>
+#include <Solid/OpticalDrive>
+#include <Solid/StorageAccess>
+
 #include <QApplication>
 #include <QClipboard>
 #include <QKeyEvent>
@@ -189,6 +195,89 @@ void DolphinContextMenu::addDirectoryItemContextMenu()
     addSeparator();
 }
 
+/* Exxos/Win7: act on a drive from the computer:/ icon view.
+
+   WHY THIS EXISTS.  Auto-mount is off by default, and deliberately so -- see
+   DolphinMainWindow::slotToggleAutoMount() for the reason.  With it off there
+   was no way to mount a drive except to open it, which is not discoverable and
+   gives no way to UNMOUNT or eject one again.  Windows shows Open / Eject on a
+   drive's context menu; this is that.
+
+   The Solid UDI comes over in UDS_EXTRA+2 rather than being reconstructed from
+   the item name: computer:/ builds the name by replacing '/' with '_' in the
+   UDI, and real UDIs contain underscores ("block_devices"), so the mapping
+   cannot be reversed.  UDS_EXTRA+3 carries the state and +4 the kind, so the
+   menu offers exactly the operations that apply.
+
+   Solid is used here in Dolphin's own process, which runs an event loop, so
+   its device state is live -- unlike inside the worker (see refreshSolid() in
+   kio-computer/computer.cpp).  The view refreshes itself afterwards through
+   the accessibilityChanged / deviceRemoved handlers in DolphinView. */
+bool DolphinContextMenu::addComputerDeviceActions()
+{
+    if (m_selectedItems.count() != 1 || m_fileInfo.isNull()) {
+        return false;
+    }
+    if (m_fileInfo.url().scheme() != QLatin1String("computer")) {
+        return false;
+    }
+
+    const KIO::UDSEntry entry = m_fileInfo.entry();
+    const QString udi   = entry.stringValue(KIO::UDSEntry::UDS_EXTRA + 2);
+    const QString state = entry.stringValue(KIO::UDSEntry::UDS_EXTRA + 3);
+    const QString kind  = entry.stringValue(KIO::UDSEntry::UDS_EXTRA + 4);
+    if (udi.isEmpty()) {
+        return false;   // the Network shortcut, or an unpatched worker
+    }
+
+    bool added = false;
+
+    if (state == QLatin1String("unmounted")) {
+        addAction(QIcon::fromTheme(QStringLiteral("media-mount")),
+                  i18nc("@action:inmenu", "Mount"), [udi]() {
+            Solid::Device dev(udi);
+            if (auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>())) {
+                access->setup();
+            }
+        });
+        added = true;
+    } else if (state == QLatin1String("mounted")) {
+        addAction(QIcon::fromTheme(QStringLiteral("media-eject")),
+                  i18nc("@action:inmenu", "Unmount"), [udi]() {
+            Solid::Device dev(udi);
+            if (auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>())) {
+                access->teardown();
+            }
+        });
+        added = true;
+    }
+
+    /* Eject applies to the tray itself, so it is offered whether or not there
+       is a disc in it -- including on an empty bay, which is how the tray gets
+       opened again after it has been closed. */
+    if (kind == QLatin1String("optical")) {
+        addAction(QIcon::fromTheme(QStringLiteral("media-optical")),
+                  i18nc("@action:inmenu", "Eject"), [udi]() {
+            /* The UDI may name the disc rather than the drive; the drive is
+               the ancestor that carries the OpticalDrive interface. An empty
+               bay's UDI already is the drive, and the walk stops at once. */
+            Solid::Device dev(udi);
+            while (dev.isValid() && !dev.is<Solid::OpticalDrive>()) {
+                dev = dev.parent();
+            }
+            if (auto *drive = const_cast<Solid::OpticalDrive *>(dev.as<Solid::OpticalDrive>())) {
+                drive->eject();
+            }
+        });
+        added = true;
+    }
+
+    if (added) {
+        addSeparator();
+    }
+    return added;
+}
+
 void DolphinContextMenu::addItemContextMenu()
 {
     Q_ASSERT(!m_fileInfo.isNull());
@@ -196,6 +285,9 @@ void DolphinContextMenu::addItemContextMenu()
     const KFileItemListProperties& selectedItemsProps = selectedItemsProperties();
 
     m_fileItemActions->setItemListProperties(selectedItemsProps);
+
+    // Exxos: Mount / Unmount / Eject go at the top, above Open.
+    addComputerDeviceActions();
 
     if (m_selectedItems.count() == 1) {
         // single files
@@ -277,6 +369,16 @@ void DolphinContextMenu::addViewportContextMenu()
 {
     const KFileItemListProperties baseUrlProperties(KFileItemList() << baseFileItem());
     m_fileItemActions->setItemListProperties(baseUrlProperties);
+
+    /* Exxos: the auto-mount toggle also lives in Settings, but computer:/ is
+       where it is wanted, and right-clicking the empty space there is a
+       shorter route than remembering which menu it is under. */
+    if (m_baseUrl.scheme() == QLatin1String("computer")) {
+        if (QAction *autoMount = m_mainWindow->actionCollection()->action(QStringLiteral("exxos_auto_mount"))) {
+            addAction(autoMount);
+            addSeparator();
+        }
+    }
 
     // Set up and insert 'Create New' menu
     KNewFileMenu* newFileMenu = m_mainWindow->newFileMenu();

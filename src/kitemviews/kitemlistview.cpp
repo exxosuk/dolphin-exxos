@@ -821,6 +821,21 @@ void KItemListView::setStyleOption(const KItemListStyleOption& option)
     const KItemListStyleOption previousOption = m_styleOption;
     m_styleOption = option;
 
+    /* Exxos/Win7: remember that the icons have to change size.
+
+       A zoom step is TWO layout passes -- this one, then the one from
+       setItemSize() -- and either of them may decide to skip animation
+       because the grid gained or lost a column. That decision is about
+       moving items around, but it also threw away the icon animation, so a
+       zoom that reflowed the grid made the icons snap while a zoom that did
+       not made them grow. That is the "sometimes it animates" behaviour.
+
+       The flag keeps the icon animation alive across both passes and is
+       cleared by doLayout() once every icon has reached its new size. */
+    if (previousOption.iconSize != option.iconSize) {
+        m_exxosIconResizePending = true;
+    }
+
     bool animate = true;
     const QSizeF margin(option.horizontalMargin, option.verticalMargin);
     if (margin != m_layouter->itemMargin()) {
@@ -1779,6 +1794,8 @@ void KItemListView::doLayout(LayoutAnimationHint hint, int changedIndex, int cha
     // instances from invisible items are reused. If no reusable items are
     // found then new KItemListWidget instances get created.
     const bool animate = (hint == Animation);
+    // Exxos/Win7: cleared below once no widget needs a new icon size any more.
+    bool iconResizeStillOutstanding = false;
     for (int i = firstVisibleIndex; i <= lastVisibleIndex; ++i) {
         bool applyNewPos = true;
 
@@ -1854,7 +1871,16 @@ void KItemListView::doLayout(LayoutAnimationHint hint, int changedIndex, int cha
                 }
             }
         } else {
-            m_animation->stop(widget);
+            /* Exxos/Win7: stopping every animation here is what killed a
+               half-finished icon grow when the second pass of a zoom decided
+               not to animate. Positions still snap; only the icon carries on. */
+            for (int t = 0; t < KItemListViewAnimation::AnimationTypeCount; ++t) {
+                const auto type = static_cast<KItemListViewAnimation::AnimationType>(t);
+                if (m_exxosIconResizePending && type == KItemListViewAnimation::IconResizeAnimation) {
+                    continue;
+                }
+                m_animation->stop(widget, type);
+            }
         }
 
         if (applyNewPos) {
@@ -1864,7 +1890,7 @@ void KItemListView::doLayout(LayoutAnimationHint hint, int changedIndex, int cha
         Q_ASSERT(widget->index() == i);
         widget->setVisible(true);
 
-        bool animateIconResizing = animate;
+        bool animateIconResizing = animate || m_exxosIconResizePending;
 
         if (widget->size() != itemBounds.size()) {
             // Resize the widget for the item to the changed size.
@@ -1899,6 +1925,16 @@ void KItemListView::doLayout(LayoutAnimationHint hint, int changedIndex, int cha
 
         const int newIconSize = widget->styleOption().iconSize;
         if (widget->iconSize() != newIconSize) {
+            iconResizeStillOutstanding = true;
+            /* Set EXXOS_ZOOM_DEBUG=1 to see why a zoom did or did not animate.
+               Kept in because this took several wrong attempts to pin down:
+               the interesting line is the one with animate=0, which is a
+               layout pass that skipped animation for grid reasons. */
+            if (Q_UNLIKELY(qEnvironmentVariableIsSet("EXXOS_ZOOM_DEBUG")) && i == firstVisibleIndex) {
+                qDebug("exxos-zoom: icon %d -> %d  animate=%d pending=%d willAnimate=%d",
+                       widget->iconSize(), newIconSize, int(animate),
+                       int(m_exxosIconResizePending), int(animateIconResizing));
+            }
             if (animateIconResizing) {
                 m_animation->start(widget, KItemListViewAnimation::IconResizeAnimation, newIconSize);
             } else {
@@ -1910,6 +1946,10 @@ void KItemListView::doLayout(LayoutAnimationHint hint, int changedIndex, int cha
         // moving-animation should be started at all is based on the previous cell-information.
         const Cell cell(m_layouter->itemColumn(i), m_layouter->itemRow(i));
         m_visibleCells.insert(i, cell);
+    }
+
+    if (!iconResizeStillOutstanding) {
+        m_exxosIconResizePending = false;
     }
 
     // Delete invisible KItemListWidget instances that have not been reused
