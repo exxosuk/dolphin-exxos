@@ -333,6 +333,18 @@ protected:
     void setStyleOption(const KItemListStyleOption& option);
 
     /**
+     * Exxos/Win7: bracket a change of view MODE (icons / compact / details).
+     *
+     * A mode change alters the icon size like a zoom does, but it is not a
+     * zoom: Explorer switches modes instantly, and animating it here made the
+     * icons grow into place over a redraw of the whole layout, which brought
+     * back the artefacts the tile view had before. Between these two calls an
+     * icon-size change is applied outright.
+     */
+    void exxosBeginLayoutSwitch();
+    void exxosEndLayoutSwitch();
+
+    /**
      * If the scroll-orientation is vertical, the items are ordered
      * from top to bottom (= default setting). If the scroll-orientation
      * is horizontal, the items are ordered from left to right.
@@ -717,6 +729,9 @@ private:
        the icons even through a layout pass that skips animation. See
        setStyleOption() and doLayout(). */
     bool m_exxosIconResizePending = false;
+    /* Exxos/Win7: true while the view MODE is changing, when the icon size
+       also changes but must not be animated. See exxosBeginLayoutSwitch(). */
+    bool m_exxosLayoutSwitching = false;
     bool m_highlightEntireRow;
     bool m_alternateBackgrounds;
     bool m_supportsItemExpanding;

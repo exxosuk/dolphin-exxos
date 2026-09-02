@@ -129,10 +129,20 @@ void DolphinItemListView::onItemLayoutChanged(ItemLayout current, ItemLayout pre
 {
     setHeaderVisible(current == DetailsLayout);
 
+    /* Exxos/Win7: a mode change is not a zoom.
+
+       updateGridSize() below changes the icon size, and letting that animate
+       meant switching to Compact grew every icon into place while the whole
+       layout was being rebuilt underneath -- which is where the old drawing
+       artefacts came back. Explorer switches modes instantly. */
+    exxosBeginLayoutSwitch();
+
     updateFont();
     updateGridSize();
 
     KFileItemListView::onItemLayoutChanged(current, previous);
+
+    exxosEndLayoutSwitch();
 }
 
 void DolphinItemListView::onPreviewsShownChanged(bool shown)

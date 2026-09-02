@@ -812,6 +812,19 @@ void KItemListView::setItemSize(const QSizeF& size)
     onItemSizeChanged(size, previousSize);
 }
 
+void KItemListView::exxosBeginLayoutSwitch()
+{
+    m_exxosLayoutSwitching = true;
+    /* Anything left over from an earlier zoom is abandoned rather than carried
+       into the new mode, where the sizes no longer mean the same thing. */
+    m_exxosIconResizePending = false;
+}
+
+void KItemListView::exxosEndLayoutSwitch()
+{
+    m_exxosLayoutSwitching = false;
+}
+
 void KItemListView::setStyleOption(const KItemListStyleOption& option)
 {
     if (m_styleOption == option) {
@@ -832,7 +845,7 @@ void KItemListView::setStyleOption(const KItemListStyleOption& option)
 
        The flag keeps the icon animation alive across both passes and is
        cleared by doLayout() once every icon has reached its new size. */
-    if (previousOption.iconSize != option.iconSize) {
+    if (previousOption.iconSize != option.iconSize && !m_exxosLayoutSwitching) {
         m_exxosIconResizePending = true;
     }
 
@@ -1890,7 +1903,8 @@ void KItemListView::doLayout(LayoutAnimationHint hint, int changedIndex, int cha
         Q_ASSERT(widget->index() == i);
         widget->setVisible(true);
 
-        bool animateIconResizing = animate || m_exxosIconResizePending;
+        bool animateIconResizing = (animate || m_exxosIconResizePending)
+                                   && !m_exxosLayoutSwitching;
 
         if (widget->size() != itemBounds.size()) {
             // Resize the widget for the item to the changed size.

@@ -19,4 +19,54 @@ if [ ! -x "$BIN" ]; then
     exec /usr/bin/dolphin "$@"
 fi
 
+# ---------------------------------------------------------------------------
+# The computer:/ worker has to match the binary.
+#
+# It lives in a root-owned plugin directory, so it cannot be updated by the
+# same build step that produces Dolphin, and three separate sessions have now
+# been spent testing device behaviour against a worker that was months out of
+# date -- every result read as "the fix did not work". The build and the
+# installed plugin are compared here, and the user is asked once, rather than
+# leaving a silent mismatch that looks exactly like a bug.
+#
+# Declining is fine: Dolphin starts either way, just with the old worker.
+# EXXOS_SKIP_WORKER_CHECK=1 skips this entirely.
+# ---------------------------------------------------------------------------
+WORKER_SRC="$HERE/../kio-computer/computer.so"
+WORKER_DST=/usr/lib/x86_64-linux-gnu/qt5/plugins/kf5/kio/computer.so
+
+if [ -z "$EXXOS_SKIP_WORKER_CHECK" ] && [ -f "$WORKER_SRC" ] \
+   && ! cmp -s "$WORKER_SRC" "$WORKER_DST"; then
+    MSG="The computer:/ drive worker is out of date.
+
+Built:     $(date -r "$WORKER_SRC" '+%d %b %H:%M')
+Installed: $([ -f "$WORKER_DST" ] && date -r "$WORKER_DST" '+%d %b %H:%M' || echo 'not installed')
+
+Drive detection - discs, cards and removable media appearing and
+disappearing - will behave as it did in the older version until this
+is updated. Administrator access is needed to replace it.
+
+Update it now?"
+    if command -v kdialog >/dev/null \
+       && kdialog --title "Dolphin Exxos Edition" --yesno "$MSG" 2>/dev/null; then
+        if pkexec /usr/bin/install -m 644 -o root -g root "$WORKER_SRC" "$WORKER_DST"; then
+            # A worker already running holds the OLD code in memory and is
+            # reused from the pool for minutes, so replacing the file is not
+            # enough on its own.
+            pkill -x kioslave5 2>/dev/null
+            kbuildsycoca5 --noincremental >/dev/null 2>&1
+            kdialog --title "Dolphin Exxos Edition" \
+                    --passivepopup "Drive worker updated." 5 2>/dev/null &
+        else
+            kdialog --title "Dolphin Exxos Edition" \
+                    --error "The drive worker could not be updated.
+
+Run this in a terminal instead:
+  sudo $HERE/../kio-computer/install.sh" 2>/dev/null &
+        fi
+    else
+        echo "computer:/ worker is stale; run: sudo $HERE/../kio-computer/install.sh" >&2
+    fi
+fi
+
 exec "$BIN" "$@"
