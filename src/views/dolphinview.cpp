@@ -2073,14 +2073,13 @@ void DolphinView::loadDirectory(const QUrl& url, bool reload)
        listing may still be the old one; the answer arrives as a device signal
        moments later and scheduleComputerReload() picks it up, which is the
        same path an insertion already takes. */
-    if (url.scheme() == QLatin1String("computer")) {
-        ExxosMediaRescan::rescanRemovable();
-        /* Say so. Reading a floppy or a card slot takes a moment, and with no
-           sign of it the view just sits there looking broken -- the drive is
-           working and the window is not saying anything. The message is
-           replaced by the usual "N items" as soon as the listing arrives. */
-        Q_EMIT infoMessage(i18nc("@info:status", "Checking drives…"));
-    }
+    /* Deliberately NOT rescanning the drives here.
+
+       It was done on every load, which includes every reload -- and a rescan
+       makes udisks emit device signals, which schedule a reload, which
+       rescans. That loop kept the floppy reading continuously for as long as
+       computer:/ was open. Media changes are the kernel's job to notice; see
+       system-tools/61-exxos-removable-polling.rules. */
 
     if (reload) {
         m_model->refreshDirectory(url);

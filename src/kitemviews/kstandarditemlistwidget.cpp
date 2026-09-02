@@ -1662,12 +1662,25 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
                                     : nameHeight;
     qreal y = qMax(qreal(option.padding), (widgetHeight - blockHeight) / 2);
 
+    /* How wide the TEXT may be, which is not always how wide the widget is.
+
+       In the details layout a row spans the whole window, so availableWidth is
+       enormous while the bar below is capped at 60% of it. The name was elided
+       against the row and therefore never elided at all: it ran off to the
+       right, past the bar, across empty space -- "overflowing into
+       nothingness". Text is measured against the bar instead, so the tile
+       reads as one block whatever the window is doing. */
+    const qreal barWidth = (m_layout == IconsLayout)
+                         ? availableWidth
+                         : qMin(availableWidth, qMax(qreal(220), availableWidth * 0.6));
+    const qreal textWidth = hasCap ? barWidth : availableWidth;
+
     // --- line 1: the drive name, bold ---
     TextInfo* nameInfo = m_textInfo.value("text");
     if (nameInfo) {
         QString name = roleText("text", values);
-        if (boldMetrics.horizontalAdvance(name) > availableWidth) {
-            name = boldMetrics.elidedText(name, Qt::ElideRight, availableWidth);
+        if (boldMetrics.horizontalAdvance(name) > textWidth) {
+            name = boldMetrics.elidedText(name, Qt::ElideRight, textWidth);
         }
         nameInfo->staticText.setText(name);
         nameInfo->pos = QPointF(x, y);
@@ -1735,9 +1748,6 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
            Applying that cap in the grid too meant the bar stopped growing with
            the zoom while the text carried on: at 32px it was twice the length
            of the text, and further up it fell behind. */
-        const qreal barWidth = (m_layout == IconsLayout)
-                             ? availableWidth
-                             : qMin(availableWidth, qMax(qreal(220), availableWidth * 0.6));
         /* Snap to whole pixels. The bar is drawn with antialiasing OFF -- a
            1px border with the fill inset 1px inside it -- so a fractional
            left edge makes the border and the fill round to different pixels
@@ -1750,8 +1760,8 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
                                        "%1 free of %2",
                                        win7Size(m_freeSpace),
                                        win7Size(m_totalSpace));
-        m_capacityFreeText.setText(tileMetrics.horizontalAdvance(freeText) > availableWidth
-                                   ? tileMetrics.elidedText(freeText, Qt::ElideRight, availableWidth)
+        m_capacityFreeText.setText(tileMetrics.horizontalAdvance(freeText) > textWidth
+                                   ? tileMetrics.elidedText(freeText, Qt::ElideRight, textWidth)
                                    : freeText);
         m_capacityFreeTextPos = QPointF(x, y);
     }

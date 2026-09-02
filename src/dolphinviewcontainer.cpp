@@ -681,6 +681,20 @@ void DolphinViewContainer::updateDirectorySortingProgress(int percent)
 
 void DolphinViewContainer::slotDirectoryLoadingStarted()
 {
+    /* Exxos/Win7: say what is happening while the drives are being read.
+
+       computer:/ asks every drive what is in it, and a floppy or a card slot
+       takes a noticeable moment to answer. With nothing on screen the window
+       simply sits there and reads as broken -- asked for three times, so it
+       plainly does. The progress bar is indeterminate on purpose: a worker
+       reports no percentage, and inventing one would be a lie. */
+    if (url().scheme() == QLatin1String("computer")) {
+        updateStatusBar();
+        m_statusBar->setProgressText(i18nc("@info:progress", "Checking drives..."));
+        m_statusBar->setProgress(-1);
+        return;
+    }
+
     if (isSearchUrl(url())) {
         // Search KIO-slaves usually don't provide any progress information. Give
         // a hint to the user that a searching is done:
