@@ -34,6 +34,7 @@
 #include <Solid/StorageDrive>
 #include <Solid/OpticalDrive>
 #include <Solid/DeviceNotifier>
+#include <QHash>
 #include <QSet>
 
 #include <QAbstractItemDelegate>
@@ -361,9 +362,10 @@ void PlacesPanel::syncHardwarePlaces()
     }
 
     // URLs this panel already carries, so nothing is added twice.
-    QSet<QString> existing;
+    QHash<QString, QModelIndex> existing;
     for (int i = 0; i < placesModel->rowCount(); ++i) {
-        existing.insert(placesModel->url(placesModel->index(i, 0)).toString());
+        const QModelIndex idx = placesModel->index(i, 0);
+        existing.insert(placesModel->url(idx).toString(), idx);
     }
 
     const auto drives = Solid::Device::listFromType(Solid::DeviceInterface::StorageDrive, QString());
@@ -385,17 +387,33 @@ void PlacesPanel::syncHardwarePlaces()
         QString name = dev.udi();
         name.replace(QLatin1Char('/'), QLatin1Char('_'));
         const QUrl url(QStringLiteral("computer:/") + name);
-        if (existing.contains(url.toString())) {
-            continue;
-        }
 
         QString label = dev.displayName();
         if (label.isEmpty()) {
             label = isOptical ? i18n("CD/DVD Drive") : i18n("Removable Drive");
         }
-        placesModel->addPlace(label, url,
-                              isOptical ? QStringLiteral("drive-optical")
-                                        : QStringLiteral("drive-removable-media"));
+        /* Say WHY the drive is listed with nothing in it. Without this an
+           empty bay reads as a drive that failed to mount; Explorer says
+           the same thing, and the icon view here already does. */
+        label += QLatin1Char(' ')
+               + (isOptical ? i18nc("@item optical drive with an empty tray", "(No disc)")
+                            : i18nc("@item removable drive with nothing in it", "(Empty)"));
+        const QString icon = isOptical ? QStringLiteral("drive-optical")
+                                       : QStringLiteral("drive-removable-media");
+
+        /* An entry we already added is UPDATED rather than left alone: a card
+           reader that has had a card taken out of it, or a bay whose
+           description changed, would otherwise keep whatever label it was
+           first given for as long as the bookmark survives -- and these are
+           persistent bookmarks. */
+        const auto it = existing.constFind(url.toString());
+        if (it != existing.constEnd()) {
+            if (placesModel->text(*it) != label) {
+                placesModel->editPlace(*it, label, url, icon);
+            }
+            continue;
+        }
+        placesModel->addPlace(label, url, icon);
     }
 }
 
@@ -417,24 +435,24 @@ void PlacesPanel::showEvent(QShowEvent* event)
         }
 
         setUrl(m_url);
-        /* syncHardwarePlaces() is DISABLED.
 
-           It worked -- empty bays appeared and were clickable -- but they landed
-           under "Places" rather than "Removable Devices", and that cannot be
-           corrected from here. KFilePlacesItem::groupType() only returns
-           RemovableDevicesType when the item is a device, an item is a device
-           only when its bookmark carries a UDI, and KFilePlacesModel drops a
-           UDI-carrying bookmark unless the device passes a predicate requiring
-           a StorageVolume or StorageAccess -- which an empty bay fails by
-           definition. Grouping it correctly and showing it while empty are the
-           same flag.
+        /* Empty bays ARE listed, under "Places".
 
-           An entry in visibly the wrong section is worse than no entry, so it
-           stays off until this is done properly, which means replacing
-           KFilePlacesModel rather than extending it. The code is kept because
-           the analysis behind it is worth not repeating.
+           They cannot be put under "Removable Devices" from here.
+           KFilePlacesItem::groupType() only returns RemovableDevicesType for a
+           device item; an item is a device only when its bookmark carries a
+           UDI; and KFilePlacesModel drops a UDI-carrying bookmark unless the
+           device is in its available-devices list, which is built from a
+           predicate requiring a StorageVolume -- exactly what an empty bay
+           does not have. Showing it while empty and grouping it correctly are
+           the same flag, and both need KFilePlacesModel replaced, not extended.
 
-           syncHardwarePlaces();  */
+           This was switched off for a while on the grounds that an entry in
+           the wrong section is worse than no entry. That was the wrong call:
+           with no entry at all the panel says there is no CD drive attached,
+           which is a plain falsehood, whereas an entry in a less tidy section
+           still tells the truth. The label says what the drive's state is. */
+        syncHardwarePlaces();
 
         /* Re-sync whenever hardware appears or disappears. Inserting a disc
            gives the drive a volume, so the model lists it itself and our

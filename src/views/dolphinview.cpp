@@ -12,6 +12,7 @@
 #include "dolphinview.h"
 
 #include "dolphin_generalsettings.h"
+#include "exxosmediarescan.h"
 #include "dolphin_detailsmodesettings.h"
 #include "dolphinitemlistview.h"
 #include "dolphinnewfilemenuobserver.h"
@@ -2062,6 +2063,18 @@ void DolphinView::loadDirectory(const QUrl& url, bool reload)
             Q_EMIT errorMessage(i18nc("@info:status", "The location '%1' is invalid.", location));
         }
         return;
+    }
+
+    /* Exxos/Win7: make sure the drives have been looked at before listing them.
+
+       Opening Computer with a floppy that was swapped while Dolphin was closed
+       showed no floppy at all, because nothing had told udisks the medium had
+       changed -- that drive is not polled. The rescan is asynchronous, so this
+       listing may still be the old one; the answer arrives as a device signal
+       moments later and scheduleComputerReload() picks it up, which is the
+       same path an insertion already takes. */
+    if (url.scheme() == QLatin1String("computer")) {
+        ExxosMediaRescan::rescanRemovable();
     }
 
     if (reload) {

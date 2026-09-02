@@ -92,6 +92,7 @@ target_sources(dolphinprivate PRIVATE
     views/dolphinitemlistview.cpp
     views/dolphinnewfilemenuobserver.cpp
     views/dolphinremoteencoding.cpp
+    exxosmediarescan.cpp
     views/dolphinview.cpp
     views/dolphinviewactionhandler.cpp
     views/draganddrophelper.cpp
@@ -194,6 +195,7 @@ target_link_libraries(
     dolphinprivate PUBLIC
     dolphinvcs
     Qt${QT_MAJOR_VERSION}::Concurrent
+    Qt${QT_MAJOR_VERSION}::DBus
     Qt${QT_MAJOR_VERSION}::Gui
     KF5::I18n
     KF5::IconThemes
@@ -427,6 +429,7 @@ target_sources(dolphinstatic PRIVATE
 target_include_directories(dolphinstatic SYSTEM PRIVATE ${PHONON_INCLUDES})
 target_link_libraries(dolphinstatic
     dolphinprivate
+    Qt${QT_MAJOR_VERSION}::DBus
     Qt${QT_MAJOR_VERSION}::Network
     KF5::CoreAddons
     KF5::KCMUtils

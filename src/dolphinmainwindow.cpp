@@ -19,6 +19,7 @@
 #include "dolphinplacesmodelsingleton.h"
 #include "dolphinurlnavigatorscontroller.h"
 #include "dolphinviewcontainer.h"
+#include "exxosmediarescan.h"
 #include "exxosnetworkdiscovery.h"
 #include "dolphintabpage.h"
 #include "middleclickactioneventfilter.h"
@@ -202,6 +203,13 @@ DolphinMainWindow::DolphinMainWindow() :
     const bool showMenu = !menuBar()->isHidden();
     QAction* showMenuBarAction = actionCollection()->action(KStandardAction::name(KStandardAction::ShowMenubar));
     showMenuBarAction->setChecked(showMenu);  // workaround for bug #171080
+
+    /* Exxos/Win7: find out what is actually in the drives before anyone looks.
+
+       A floppy swapped while Dolphin was closed is otherwise invisible when it
+       opens -- the kernel does not poll that drive, so udisks never learned
+       about it. See ExxosMediaRescan. */
+    QTimer::singleShot(1200, this, []() { ExxosMediaRescan::rescanRemovable(); });
 
     /* Exxos/Win7: populate Network in the background, so it is already filled
        in by the time anyone clicks it. Deferred rather than immediate: the
@@ -1873,6 +1881,29 @@ void DolphinMainWindow::setupActions()
        ExxosNetworkDiscovery for why -- and when a network view is empty there
        is otherwise no way to tell "nothing is there" from "the lookup failed".
        This asks, and says what it found. */
+    /* Exxos/Win7: "Scan for Devices" -- the drive-side counterpart. Asks
+       udisks to re-examine every removable drive, which is the only way a
+       floppy change is noticed at all on this hardware. */
+    QAction* scanDevices = actionCollection()->addAction(QStringLiteral("exxos_scan_devices"));
+    scanDevices->setText(i18nc("@action:inmenu Settings", "Scan for Devices"));
+    scanDevices->setIcon(QIcon::fromTheme(QStringLiteral("drive-removable-media")));
+    scanDevices->setWhatsThis(xi18nc("@info:whatsthis",
+        "Re-reads every removable drive, so a disc, card or floppy that was "
+        "changed is noticed.<nl/><nl/>"
+        "This happens by itself when Dolphin starts and when you open "
+        "Computer. Use it if a drive still shows the wrong thing."));
+    connect(scanDevices, &QAction::triggered, this, [this]() {
+        ExxosMediaRescan::rescanRemovable();
+        if (m_activeViewContainer) {
+            // Give udisks a moment to report back before re-listing.
+            QTimer::singleShot(1500, this, [this]() {
+                if (m_activeViewContainer) {
+                    m_activeViewContainer->view()->reload();
+                }
+            });
+        }
+    });
+
     QAction* scanNetwork = actionCollection()->addAction(QStringLiteral("exxos_scan_network"));
     scanNetwork->setText(i18nc("@action:inmenu Settings", "Scan for Network Devices"));
     scanNetwork->setIcon(QIcon::fromTheme(QStringLiteral("network-workgroup")));
