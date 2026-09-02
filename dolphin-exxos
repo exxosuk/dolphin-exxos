@@ -77,4 +77,58 @@ if [ -f "$WORKER_SRC" ]; then
     export QT_PLUGIN_PATH
 fi
 
+# ---------------------------------------------------------------------------
+# Media-change polling for removable drives.
+#
+# The one piece that genuinely needs root, and only once. Without it a floppy
+# or card swap is invisible to the whole desktop: udisks is never told, because
+# nothing polls the drive. udisks Block.Rescan was measured to make no
+# difference at all -- see system-tools/61-exxos-removable-polling.rules.
+#
+# Asked once, with a graphical password prompt, and remembered either way.
+# EXXOS_SKIP_POLL_CHECK=1 skips it.
+# ---------------------------------------------------------------------------
+POLL_RULE=/etc/udev/rules.d/61-exxos-removable-polling.rules
+POLL_ASKED="$HOME/.config/exxos-media-polling-declined"
+
+if [ -z "$EXXOS_SKIP_POLL_CHECK" ] && [ ! -f "$POLL_RULE" ] && [ ! -f "$POLL_ASKED" ] \
+   && [ -x "$HERE/../system-tools/install-media-polling.sh" ]; then
+    unpolled=""
+    for d in /sys/block/sd[a-z] /sys/block/mmcblk[0-9]; do
+        [ -e "$d" ] || continue
+        [ "$(cat "$d/removable" 2>/dev/null)" = "1" ] || continue
+        case "$(cat "$d/events_poll_msecs" 2>/dev/null)" in
+            -1|"") unpolled="$unpolled $(basename "$d")" ;;
+        esac
+    done
+    # In the BACKGROUND: kdialog blocks until it is answered, and Dolphin must
+    # not wait on a question nobody is at the machine to read.
+    if [ -n "$unpolled" ] && command -v kdialog >/dev/null; then
+      (
+        if kdialog --title "Dolphin Exxos Edition" --yesno \
+"These removable drives are not checked for media changes:
+$unpolled
+
+A disk or card put into one of them will not be noticed until something
+else happens - the drive never announces it, and nothing is asking.
+The CD/DVD drive works only because it IS asked.
+
+This installs one udev rule so the kernel checks them too. It asks the
+drive whether the medium changed; it does not read the disk, so an idle
+drive is not made to spin.
+
+Administrator access is needed, once. Set it up now?" 2>/dev/null; then
+            pkexec "$HERE/../system-tools/install-media-polling.sh" \
+                > "${TMPDIR:-/tmp}/exxos-media-poll.log" 2>&1 \
+                && kdialog --title "Dolphin Exxos Edition" --msgbox \
+                   "Removable drives are now checked for media changes.
+
+$(cat "${TMPDIR:-/tmp}/exxos-media-poll.log")" 2>/dev/null &
+        else
+            : > "$POLL_ASKED"      # asked, declined: do not nag again
+        fi
+      ) >/dev/null 2>&1 &
+    fi
+fi
+
 exec "$BIN" "$@"
