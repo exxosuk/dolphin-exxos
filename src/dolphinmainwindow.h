@@ -24,6 +24,7 @@
 #include <QList>
 #include <QMenu>
 #include <QPointer>
+#include <QSet>
 #include <QUrl>
 #include <QVector>
 
@@ -714,6 +715,9 @@ private:
     PlacesPanel* m_placesPanel;
     /* Exxos: populates Network with the machines on this subnet. */
     ExxosNetworkDiscovery* m_networkDiscovery;
+    /* Exxos: volumes auto-mount has already tried, so a device that
+       refuses is not retried for ever. Pruned when it disappears. */
+    QSet<QString> m_exxosMountAttempted;
     bool m_tearDownFromPlacesRequested;
 
     KToolBarPopupAction* m_backAction;

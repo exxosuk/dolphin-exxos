@@ -222,6 +222,28 @@ DolphinMainWindow::DolphinMainWindow() :
        system-tools/61-exxos-removable-polling.rules; dolphin-exxos offers to
        install it. */
 
+    /* Exxos/Win7: mount what is already in the drives.
+
+       Auto-mount only ran on deviceAdded, so a disk that was in the drive
+       BEFORE Dolphin started was never mounted -- which is why the floppy sat
+       there reading "not mounted" with no label and no free space while the
+       setting was on. The same sweep repeats on a slow timer, because a medium
+       noticed by polling does not necessarily arrive as a device ADDED signal;
+       each volume is attempted only once, so nothing is retried for ever. */
+    QTimer::singleShot(1800, this, [this]() {
+        if (KSharedConfig::openConfig()->group("Exxos").readEntry("AutoMountRemovable", false)) {
+            exxosMountRemovableVolumes();
+        }
+    });
+    auto *autoMountWatch = new QTimer(this);
+    autoMountWatch->setInterval(6000);
+    connect(autoMountWatch, &QTimer::timeout, this, [this]() {
+        if (KSharedConfig::openConfig()->group("Exxos").readEntry("AutoMountRemovable", false)) {
+            exxosMountRemovableVolumes();
+        }
+    });
+    autoMountWatch->start();
+
     /* Exxos/Win7: populate Network in the background, so it is already filled
        in by the time anyone clicks it. Deferred rather than immediate: the
        probe is harmless but start-up should not wait on the network. */
@@ -1645,6 +1667,14 @@ void DolphinMainWindow::exxosScanNetwork()
 void DolphinMainWindow::exxosMountRemovableVolumes()
 {
     const auto devices = Solid::Device::listFromType(Solid::DeviceInterface::StorageAccess, QString());
+
+    // Forget anything that has gone, so re-inserting it is tried again.
+    QSet<QString> present;
+    for (const Solid::Device &dev : devices) {
+        present.insert(dev.udi());
+    }
+    m_exxosMountAttempted.intersect(present);
+
     for (const Solid::Device &dev : devices) {
         auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>());
         if (!access || access->isAccessible()) {
@@ -1654,6 +1684,15 @@ void DolphinMainWindow::exxosMountRemovableVolumes()
         if (volume && volume->isIgnored()) {
             continue;
         }
+        /* Once each. A volume that refuses -- a disk with a filesystem the
+           kernel will not mount, say -- would otherwise be retried every few
+           seconds for as long as it stayed in the drive, spinning the drive
+           each time. Taking it out and putting it back tries again, which is
+           what anyone would expect. */
+        if (m_exxosMountAttempted.contains(dev.udi())) {
+            continue;
+        }
+        m_exxosMountAttempted.insert(dev.udi());
         access->setup();   // asynchronous; udisks does the work
     }
 }

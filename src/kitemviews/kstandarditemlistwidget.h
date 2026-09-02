@@ -111,6 +111,15 @@ public:
        The WHOLE tile scales with the zoom -- icon, name, capacity bar and the
        free-space line -- rather than only the icon growing while the text and
        the bar stay the size they were. */
+    /**
+     * Exxos/Win7: how much bigger a tile's icon is drawn than the zoom level.
+     *
+     * A capacity tile stacks four rows of text beside the icon, so an icon
+     * sized purely by the zoom looked lost next to them. The boost applies to
+     * the ICON only -- exxosTileScale() divides it back out so the fonts and
+     * the bar keep following the zoom, not the boost.
+     */
+    static qreal exxosTileIconBoost() { return 1.6; }
     static qreal exxosTileScale(int iconSize);
 
     /* Gap between the icon and the text column in a tile. Explorer leaves a
@@ -120,6 +129,8 @@ public:
        icon + gap + bar. */
     static int exxosTileIconGap(int iconSize);
     QFont exxosTileFont() const;
+    /** Slightly smaller: the hardware line and the free-space line. */
+    QFont exxosTileSmallFont() const;
 
 protected:
     /**

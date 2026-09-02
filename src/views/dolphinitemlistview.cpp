@@ -279,23 +279,33 @@ void DolphinItemListView::updateGridSize()
                makes the 32 and 48 stops visibly different again, which they
                were not while both were clamped to 48. */
             effectiveIconSize = qMax(iconSize, 32);
+            /* Draw the icon larger than the zoom level asks for. Four rows of
+               text beside a 32px icon left the icon looking lost; the boost is
+               divided back out inside exxosTileScale(), so the fonts and the
+               bar still follow the zoom and the stops stay distinct. */
+            effectiveIconSize = qRound(effectiveIconSize
+                                       * KStandardItemListWidget::exxosTileIconBoost());
             /* The cell has to grow with the zoom too, or the icon gets bigger
                while the bar and the text stay the size they were and the tile
                stops looking like one thing. Same scale the widget uses for the
                tile fonts. */
             const qreal tileScale = KStandardItemListWidget::exxosTileScale(effectiveIconSize);
             const int barWidth  = qRound(220 * tileScale);
-            /* FOUR rows now, not three: what the hardware is, the medium's
-               own name, the capacity bar, and the free-space line. The label
-               shared line one before and was the half that got clipped. */
-            const int textBlock = qRound(4 * option.fontMetrics.lineSpacing() * tileScale);
+            /* Four rows -- label, drive model, bar, free space -- but two of
+               them are set smaller and the bar is flatter than a line of text,
+               so 3.7 lines is the room they actually need. Asking for a full
+               4 left a band of dead space inside every tile. */
+            const int textBlock = qRound(3.7 * option.fontMetrics.lineSpacing() * tileScale);
             // icon + the gap the widget leaves after it + the bar
             itemWidth  = padding * 2 + effectiveIconSize
                        + KStandardItemListWidget::exxosTileIconGap(effectiveIconSize)
                        + barWidth;
             itemHeight = padding * 3 + qMax(effectiveIconSize, textBlock);
             horizontalMargin = 8;
-            verticalMargin = 4;
+            /* Room between the rows. With one line of text a 4px gap read as a
+               list; with four it read as one continuous block of text and the
+               drives ran together. */
+            verticalMargin = 12;
             maxTextLines = 1;
         }
 
@@ -336,7 +346,7 @@ void DolphinItemListView::updateGridSize()
             /* FOUR rows now, not three: what the hardware is, the medium's
                own name, the capacity bar, and the free-space line. The label
                shared line one before and was the half that got clipped. */
-            const int textBlock = qRound(4 * option.fontMetrics.lineSpacing() * tileScale);
+            const int textBlock = qRound(3.7 * option.fontMetrics.lineSpacing() * tileScale);
             itemHeight = padding * 2 + qMax(effectiveIconSize, textBlock);
         } else {
             itemHeight = padding * 2 + qMax(iconSize, option.fontMetrics.lineSpacing());

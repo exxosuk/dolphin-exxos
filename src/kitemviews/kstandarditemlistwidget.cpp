@@ -446,11 +446,11 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
     if (m_isTile) {
         drawCapacityBar(painter);
         if (!m_exxosLabelText.text().isEmpty()) {
-            painter->setFont(exxosTileFont());
+            painter->setFont(exxosTileSmallFont());
             painter->drawStaticText(m_exxosLabelTextPos, m_exxosLabelText);
         }
         if (!m_capacityFreeText.text().isEmpty()) {
-            painter->setFont(exxosTileFont());
+            painter->setFont(exxosTileSmallFont());
             painter->setPen(m_additionalInfoTextColor);
             painter->drawStaticText(m_capacityFreeTextPos, m_capacityFreeText);
             painter->setPen(textColor());
@@ -1589,7 +1589,12 @@ qreal KStandardItemListWidget::exxosTileScale(int iconSize)
 
        Growth stays gentler than the icon's own so the text does not become
        comical beside a very large icon, and it never drops below 1. */
-    return qBound(qreal(1.0), qreal(1.0) + (qMax(1, iconSize) - 32.0) / 48.0 * 0.5, qreal(2.2));
+    /* iconSize arrives BOOSTED (see exxosTileIconBoost): the tile draws its
+       icon larger than the zoom level so it holds its own beside four rows of
+       text. Undo that here, or the fonts and the bar would grow with the boost
+       as well and nothing would have been gained. */
+    const qreal zoomIcon = qMax(1.0, iconSize / exxosTileIconBoost());
+    return qBound(qreal(1.0), qreal(1.0) + (zoomIcon - 32.0) / 48.0 * 0.5, qreal(2.2));
 }
 
 int KStandardItemListWidget::exxosTileIconGap(int iconSize)
@@ -1607,6 +1612,19 @@ QFont KStandardItemListWidget::exxosTileFont() const
         tileFont.setPixelSize(qRound(tileFont.pixelSize() * scale));
     }
     return tileFont;
+}
+
+QFont KStandardItemListWidget::exxosTileSmallFont() const
+{
+    /* The drive model and the free-space line are supporting detail, not the
+       name of the thing, so they are set a shade smaller than the label. */
+    QFont f = exxosTileFont();
+    if (f.pointSizeF() > 0) {
+        f.setPointSizeF(qMax(qreal(6.0), f.pointSizeF() * 0.88));
+    } else if (f.pixelSize() > 0) {
+        f.setPixelSize(qMax(8, qRound(f.pixelSize() * 0.88)));
+    }
+    return f;
 }
 
 void KStandardItemListWidget::updateTilesLayoutTextCache()
@@ -1653,14 +1671,16 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
     const qreal availableWidth = size().width() - x - 2 * option.padding;
 
     const QFont tileFont = exxosTileFont();
+    const QFont smallFont = exxosTileSmallFont();
     QFont boldFont = tileFont;
     boldFont.setBold(true);
     const QFontMetrics boldMetrics(boldFont);
-    const QFontMetrics tileMetrics(tileFont);
+    const QFontMetrics tileMetrics(smallFont);   // the two supporting rows
 
     const int nameHeight = boldMetrics.height();
     const int freeHeight = tileMetrics.height();
-    const int barHeight  = qMax(9, freeHeight - 4);
+    // 2px flatter: with four rows stacked beside it a thick bar dominated them.
+    const int barHeight  = qMax(7, freeHeight - 6);
     const qreal gap      = qMax(qreal(1), qreal(option.padding) / 2);
 
     /* The media's own name goes on its own line, under what the hardware is.
