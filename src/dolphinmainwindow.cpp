@@ -211,6 +211,32 @@ DolphinMainWindow::DolphinMainWindow() :
        about it. See ExxosMediaRescan. */
     QTimer::singleShot(1200, this, []() { ExxosMediaRescan::rescanRemovable(); });
 
+    /* And keep looking, because some drives never say anything at all.
+
+       A floppy reports no media change and is not polled, so a disk put in
+       while the window sits open is invisible for as long as nothing else
+       happens -- which is why inserting a card made the floppy appear too:
+       any udisks activity swept it up. Five seconds is often enough to feel
+       immediate without making an empty drive work for it; a rescan of a
+       drive with no medium is answered from the drive's controller and does
+       not seek. Optical drives are excluded (see ExxosMediaRescan). */
+    auto *mediaWatch = new QTimer(this);
+    mediaWatch->setInterval(5000);
+    connect(mediaWatch, &QTimer::timeout, this, []() {
+        /* Empty drives every five seconds, all of them every half minute.
+
+           An insertion is what needs to feel immediate, and asking a drive
+           with nothing in it is quiet -- it answers from its controller and
+           does not seek. Asking a drive that HAS a disk in it costs a read,
+           so doing that every five seconds would leave a floppy working
+           continuously for as long as Dolphin was open; a removal can wait. */
+        static int tick = 0;
+        ExxosMediaRescan::rescanRemovable((++tick % 6 == 0)
+                                          ? ExxosMediaRescan::AllRemovable
+                                          : ExxosMediaRescan::EmptyDrivesOnly);
+    });
+    mediaWatch->start();
+
     /* Exxos/Win7: populate Network in the background, so it is already filled
        in by the time anyone clicks it. Deferred rather than immediate: the
        probe is harmless but start-up should not wait on the network. */
@@ -1895,6 +1921,8 @@ void DolphinMainWindow::setupActions()
     connect(scanDevices, &QAction::triggered, this, [this]() {
         ExxosMediaRescan::rescanRemovable();
         if (m_activeViewContainer) {
+            m_activeViewContainer->showMessage(i18nc("@info:status", "Checking drives…"),
+                                               DolphinViewContainer::Information);
             // Give udisks a moment to report back before re-listing.
             QTimer::singleShot(1500, this, [this]() {
                 if (m_activeViewContainer) {

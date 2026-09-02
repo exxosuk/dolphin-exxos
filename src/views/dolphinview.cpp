@@ -2075,6 +2075,11 @@ void DolphinView::loadDirectory(const QUrl& url, bool reload)
        same path an insertion already takes. */
     if (url.scheme() == QLatin1String("computer")) {
         ExxosMediaRescan::rescanRemovable();
+        /* Say so. Reading a floppy or a card slot takes a moment, and with no
+           sign of it the view just sits there looking broken -- the drive is
+           working and the window is not saying anything. The message is
+           replaced by the usual "N items" as soon as the listing arrives. */
+        Q_EMIT infoMessage(i18nc("@info:status", "Checking drives…"));
     }
 
     if (reload) {

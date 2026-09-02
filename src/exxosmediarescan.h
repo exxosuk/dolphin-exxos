@@ -39,8 +39,18 @@
  */
 namespace ExxosMediaRescan
 {
+enum Scope {
+    /** Only drives reporting no medium: catches an insertion, and is quiet --
+     *  a drive with nothing in it answers from its controller without seeking. */
+    EmptyDrivesOnly,
+    /** Every removable drive, which is what catches a REMOVAL as well. Costs a
+     *  read on a drive that has a disk in it, so it is not done every few
+     *  seconds; a floppy left in the drive would be working constantly. */
+    AllRemovable
+};
+
 /** Asynchronous: returns at once, results arrive as Solid device signals. */
-DOLPHIN_EXPORT void rescanRemovable();
+DOLPHIN_EXPORT void rescanRemovable(Scope scope = AllRemovable);
 }
 
 #endif // EXXOSMEDIARESCAN_H

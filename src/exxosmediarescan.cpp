@@ -30,7 +30,20 @@ bool isRemovable(const QString &name)
 }
 }
 
-void ExxosMediaRescan::rescanRemovable()
+namespace
+{
+/* Size in 512-byte sectors; 0 means the drive currently reports no medium. */
+bool hasMedium(const QString &name)
+{
+    QFile f(QStringLiteral("/sys/block/%1/size").arg(name));
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return true;   // unknown: treat as loaded, which only means we ask less often
+    }
+    return f.readAll().trimmed().toLongLong() > 0;
+}
+}
+
+void ExxosMediaRescan::rescanRemovable(Scope scope)
 {
     QDBusConnection bus = QDBusConnection::systemBus();
     if (!bus.isConnected()) {
@@ -41,11 +54,25 @@ void ExxosMediaRescan::rescanRemovable()
                                     .entryList(QDir::Dirs | QDir::NoDotAndDotDot);
     for (const QString &name : devices) {
         // Skip the pseudo-devices: loop, ram, device-mapper, zram, md.
-        if (!name.startsWith(QLatin1String("sd")) && !name.startsWith(QLatin1String("sr"))
+        if (!name.startsWith(QLatin1String("sd"))
             && !name.startsWith(QLatin1String("fd")) && !name.startsWith(QLatin1String("mmcblk"))) {
             continue;
         }
+        /* NEVER an optical drive.
+           Rescanning one with the tray open makes the drive CLOSE the tray and
+           re-read the disc, so ejecting a disc and then refreshing the view
+           pulled the tray shut before the disc could be taken out -- the disc
+           became physically unremovable while Dolphin was open. Optical drives
+           are polled by the kernel anyway (61-optical-polling-rules sets
+           /sys/block/sr0/events_poll_msecs to 2500), so they never needed this:
+           it is the drives with no polling that do. */
+        if (name.startsWith(QLatin1String("sr"))) {
+            continue;
+        }
         if (!isRemovable(name)) {
+            continue;
+        }
+        if (scope == EmptyDrivesOnly && hasMedium(name)) {
             continue;
         }
 
