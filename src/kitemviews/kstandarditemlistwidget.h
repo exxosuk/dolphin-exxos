@@ -294,6 +294,10 @@ private:
     QRectF m_capacityBarRect;
     QPointF m_capacityFreeTextPos;
     QStaticText m_capacityFreeText;
+    /* Exxos/Win7: the media's own name, on its own line under what the
+       hardware is. Sharing one line clipped whichever came second. */
+    QPointF m_exxosLabelTextPos;
+    QStaticText m_exxosLabelText;
     QPointF m_pixmapPos;
     QPixmap m_pixmap;
     QSize m_scaledPixmapSize; //Size of the pixmap in device independent pixels

@@ -285,7 +285,10 @@ void DolphinItemListView::updateGridSize()
                tile fonts. */
             const qreal tileScale = KStandardItemListWidget::exxosTileScale(effectiveIconSize);
             const int barWidth  = qRound(220 * tileScale);
-            const int textBlock = qRound(3 * option.fontMetrics.lineSpacing() * tileScale);
+            /* FOUR rows now, not three: what the hardware is, the medium's
+               own name, the capacity bar, and the free-space line. The label
+               shared line one before and was the half that got clipped. */
+            const int textBlock = qRound(4 * option.fontMetrics.lineSpacing() * tileScale);
             // icon + the gap the widget leaves after it + the bar
             itemWidth  = padding * 2 + effectiveIconSize
                        + KStandardItemListWidget::exxosTileIconGap(effectiveIconSize)
@@ -330,7 +333,10 @@ void DolphinItemListView::updateGridSize()
         if (tileLayout) {
             effectiveIconSize = qMax(iconSize, 32);   // see the icons branch
             const qreal tileScale = KStandardItemListWidget::exxosTileScale(effectiveIconSize);
-            const int textBlock = qRound(3 * option.fontMetrics.lineSpacing() * tileScale);
+            /* FOUR rows now, not three: what the hardware is, the medium's
+               own name, the capacity bar, and the free-space line. The label
+               shared line one before and was the half that got clipped. */
+            const int textBlock = qRound(4 * option.fontMetrics.lineSpacing() * tileScale);
             itemHeight = padding * 2 + qMax(effectiveIconSize, textBlock);
         } else {
             itemHeight = padding * 2 + qMax(iconSize, option.fontMetrics.lineSpacing());

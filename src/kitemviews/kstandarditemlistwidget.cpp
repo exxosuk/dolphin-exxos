@@ -445,6 +445,10 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
        background and any selection highlight. */
     if (m_isTile) {
         drawCapacityBar(painter);
+        if (!m_exxosLabelText.text().isEmpty()) {
+            painter->setFont(exxosTileFont());
+            painter->drawStaticText(m_exxosLabelTextPos, m_exxosLabelText);
+        }
         if (!m_capacityFreeText.text().isEmpty()) {
             painter->setFont(exxosTileFont());
             painter->setPen(m_additionalInfoTextColor);
@@ -1214,6 +1218,7 @@ void KStandardItemListWidget::updatePixmapCache()
                 const qreal shift = wantX - nameInfo->pos.x();
                 nameInfo->pos.setX(nameInfo->pos.x() + shift);
                 m_capacityFreeTextPos.setX(m_capacityFreeTextPos.x() + shift);
+                m_exxosLabelTextPos.setX(m_exxosLabelTextPos.x() + shift);
                 if (!m_capacityBarRect.isEmpty()) {
                     m_capacityBarRect.moveLeft(m_capacityBarRect.left() + shift);
                     // keep it inside the widget
@@ -1658,8 +1663,21 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
     const int barHeight  = qMax(9, freeHeight - 4);
     const qreal gap      = qMax(qreal(1), qreal(option.padding) / 2);
 
-    const qreal blockHeight = hasCap ? (nameHeight + gap + barHeight + gap + freeHeight)
-                                    : nameHeight;
+    /* The media's own name goes on its own line, under what the hardware is.
+
+       The worker sends one string, "<hardware> - <medium>", e.g.
+           "Generic STORAGE DEVICE - [no label]"
+           "Samsung SSD 870 QVO 1TB - QVO BACKUP (ntfs)"
+       and sharing one line meant whichever half came second was clipped --
+       usually the label, which is the half that identifies the disk. */
+    const QString wholeName = roleText("text", values);
+    const int nameDash = wholeName.indexOf(QStringLiteral(" \u2014 "));
+    const bool hasLabelLine = hasCap && nameDash > 0;
+
+    const qreal blockHeight = hasCap
+        ? (nameHeight + gap + (hasLabelLine ? freeHeight + gap : qreal(0))
+           + barHeight + gap + freeHeight)
+        : nameHeight;
     qreal y = qMax(qreal(option.padding), (widgetHeight - blockHeight) / 2);
 
     /* How wide the TEXT may be, which is not always how wide the widget is.
@@ -1675,10 +1693,10 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
                          : qMin(availableWidth, qMax(qreal(220), availableWidth * 0.6));
     const qreal textWidth = hasCap ? barWidth : availableWidth;
 
-    // --- line 1: the drive name, bold ---
+    // --- line 1: what the hardware is, bold ---
     TextInfo* nameInfo = m_textInfo.value("text");
     if (nameInfo) {
-        QString name = roleText("text", values);
+        QString name = hasLabelLine ? wholeName.left(nameDash) : wholeName;
         if (boldMetrics.horizontalAdvance(name) > textWidth) {
             name = boldMetrics.elidedText(name, Qt::ElideRight, textWidth);
         }
@@ -1699,6 +1717,7 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
         // two, which is what Explorer shows and what the tile already has room
         // for.
         m_capacityBarRect = QRectF();
+        m_exxosLabelText.setText(QString());
         /* Split the ORIGINAL role text, not nameInfo->staticText, which the
            block above has already elided to fit one line -- splitting that
            gave "CD-RW/DVD+-RW DL Drive" plus a tail of "n...", the remains of
@@ -1734,7 +1753,20 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
     } else {
         y += nameHeight + gap;
 
-        // --- line 2: the capacity bar ---
+        // --- line 2: the medium's own name ---
+        if (hasLabelLine) {
+            QString label = wholeName.mid(nameDash + 3);
+            if (tileMetrics.horizontalAdvance(label) > textWidth) {
+                label = tileMetrics.elidedText(label, Qt::ElideRight, textWidth);
+            }
+            m_exxosLabelText.setText(label);
+            m_exxosLabelTextPos = QPointF(x, y);
+            y += freeHeight + gap;
+        } else {
+            m_exxosLabelText.setText(QString());
+        }
+
+        // --- line 3: the capacity bar ---
         /* Fill the width the tile actually has, rather than a fixed 220.
            In the icons grid the cell is sized around a 220px bar anyway, so
            this changes nothing there. In details layout the row spans the
