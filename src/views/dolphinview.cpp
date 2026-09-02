@@ -598,22 +598,24 @@ void DolphinView::scheduleComputerReload()
                 return;
             }
             reload();
-            /* Reload a second time, later.
+            /* ONE pass, not two.
 
-               One pass is not enough in either direction: on insertion the
-               volume may not have been probed yet, and on EJECT udisks can
-               take longer still to drop it -- ejecting left the view showing
-               the disc that was no longer there. Rather than guess a single
-               delay long enough for the slowest case and sluggish for the
-               rest, refresh promptly and then confirm. */
-            if (m_computerReloadPasses > 1) {
-                --m_computerReloadPasses;
-                m_computerReloadTimer->start(3000);
-            }
+               There used to be a second reload three seconds later, to catch
+               udisks settling late. It fired whether or not anything had
+               changed, so an ordinary media change made the view flicker
+               twice and the second flicker never showed anything new. There
+               is no need for it now: ExxosMediaWatch polls the kernel every
+               two seconds and will schedule another refresh the moment
+               something really does change, and any late word from udisks
+               arrives as a Solid signal that schedules one too. */
+            Q_UNUSED(m_computerReloadPasses)
         });
     }
-    m_computerReloadPasses = 2;
-    m_computerReloadTimer->start(1200);
+    /* Coalesce: several signals arrive for one physical change -- the volume,
+       its parent, the access state -- and restarting the timer each time is
+       what keeps them to a single refresh. */
+    m_computerReloadPasses = 1;
+    m_computerReloadTimer->start(1400);
 }
 
 void DolphinView::reload()

@@ -7,6 +7,7 @@
 #include "dolphinviewcontainer.h"
 
 #include "dolphin_generalsettings.h"
+#include "exxosmediarescan.h"
 #include "dolphindebug.h"
 #include "dolphinplacesmodelsingleton.h"
 #include "filterbar/filterbar.h"
@@ -712,6 +713,13 @@ void DolphinViewContainer::slotDirectoryLoadingStarted()
 
 void DolphinViewContainer::slotDirectoryLoadingCompleted()
 {
+    /* Exxos/Win7: the drives have now actually been read, so stop the
+       spinners. Tying it to the listing rather than to a timer is the whole
+       point -- a floppy can take several seconds longer than any guess. */
+    if (url().scheme() == QLatin1String("computer")) {
+        ExxosBusySpinner::instance()->setGlobalBusy(false);
+    }
+
     if (!m_statusBar->progressText().isEmpty()) {
         m_statusBar->setProgressText(QString());
         m_statusBar->setProgress(100);

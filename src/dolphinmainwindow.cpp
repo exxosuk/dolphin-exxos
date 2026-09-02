@@ -254,33 +254,55 @@ DolphinMainWindow::DolphinMainWindow() :
     auto *mediaWatch = new ExxosMediaWatch(this);
     connect(mediaWatch, &ExxosMediaWatch::mediaChanged, this,
             [this](const QString &device, bool inserted) {
-        const QString udi = QStringLiteral("/org/freedesktop/UDisks2/block_devices/") + device;
-        ExxosBusySpinner::instance()->setBusy(udi, true);
+        Q_UNUSED(device)
+        /* Every drive spins, not just the one that changed.
+
+           The event names the volume that appeared or vanished, but the tile
+           that needs to show progress is not necessarily that one -- eject a
+           disc and the tile that takes its place is the empty BAY, a different
+           device entirely. A refresh re-reads them all in any case. */
+        ExxosBusySpinner::instance()->setGlobalBusy(true);
 
         if (m_activeViewContainer) {
             m_activeViewContainer->statusBar()->exxosShowBusy(
                 inserted ? i18nc("@info:progress", "Reading disc...")
-                         : i18nc("@info:progress", "Checking drives..."), 2500);
+                         : i18nc("@info:progress", "Checking drives..."), 2000);
+            /* One scheduler for the whole application, so a change that
+               produces several signals still refreshes once. */
+            m_activeViewContainer->view()->scheduleComputerReload();
         }
-
-        /* Two passes. udisks may need a moment to notice, and on a removal it
-           takes longer still to drop the volume, so refresh promptly and then
-           confirm -- the same reasoning as scheduleComputerReload(). */
-        QTimer::singleShot(1200, this, [this]() {
-            if (m_activeViewContainer
-                && m_activeViewContainer->url().scheme() == QLatin1String("computer")) {
-                m_activeViewContainer->view()->reload();
-            }
-        });
-        QTimer::singleShot(3000, this, [this, udi]() {
-            if (m_activeViewContainer
-                && m_activeViewContainer->url().scheme() == QLatin1String("computer")) {
-                m_activeViewContainer->view()->reload();
-            }
-            ExxosBusySpinner::instance()->setBusy(udi, false);
-        });
     });
     mediaWatch->start();
+
+    /* A disc or a card announces itself through Solid rather than through a
+       size change, so those events have to raise the spinner too -- otherwise
+       it appeared for the floppy and for nothing else. */
+    connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceAdded,
+            this, [this](const QString &) {
+        ExxosBusySpinner::instance()->setGlobalBusy(true);
+        if (m_activeViewContainer) {
+            m_activeViewContainer->statusBar()->exxosShowBusy(
+                i18nc("@info:progress", "Reading disc..."), 2000);
+        }
+    });
+    connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceRemoved,
+            this, [this](const QString &) {
+        ExxosBusySpinner::instance()->setGlobalBusy(true);
+        if (m_activeViewContainer) {
+            m_activeViewContainer->statusBar()->exxosShowBusy(
+                i18nc("@info:progress", "Checking drives..."), 2000);
+        }
+    });
+
+    /* A drive that never answers must not leave the spinner turning for ever.
+       Normally the listing stops it (see DolphinViewContainer), and this only
+       ever fires if that did not happen. */
+    auto *spinCap = new QTimer(this);
+    spinCap->setInterval(30000);
+    connect(spinCap, &QTimer::timeout, this, []() {
+        ExxosBusySpinner::instance()->setGlobalBusy(false);
+    });
+    spinCap->start();
 
     /* One rescan at start-up, and only one.
 

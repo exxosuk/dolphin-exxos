@@ -183,17 +183,37 @@ void ExxosBusySpinner::setBusy(const QString &udi, bool busy)
     if (udi.isEmpty()) {
         return;
     }
-    const bool had = !m_busy.isEmpty();
+    const bool had = anyBusy();
     if (busy) {
         m_busy.insert(udi);
     } else {
         m_busy.remove(udi);
     }
-    const bool has = !m_busy.isEmpty();
-    if (has && !had) {
+    updateTimer(had);
+}
+
+void ExxosBusySpinner::setGlobalBusy(bool busy)
+{
+    if (m_globalBusy == busy) {
+        return;
+    }
+    const bool had = anyBusy();
+    m_globalBusy = busy;
+    updateTimer(had);
+}
+
+bool ExxosBusySpinner::anyBusy() const
+{
+    return m_globalBusy || !m_busy.isEmpty();
+}
+
+void ExxosBusySpinner::updateTimer(bool wasBusy)
+{
+    const bool now = anyBusy();
+    if (now && !wasBusy) {
         m_phase = 0;
         m_timer->start();
-    } else if (!has && had) {
+    } else if (!now && wasBusy) {
         m_timer->stop();
     }
     Q_EMIT tick();                     // repaint immediately on the change
@@ -201,5 +221,8 @@ void ExxosBusySpinner::setBusy(const QString &udi, bool busy)
 
 bool ExxosBusySpinner::isBusy(const QString &udi) const
 {
-    return !udi.isEmpty() && m_busy.contains(udi);
+    if (udi.isEmpty()) {
+        return false;                  // not a drive: the Network shortcut, say
+    }
+    return m_globalBusy || m_busy.contains(udi);
 }
