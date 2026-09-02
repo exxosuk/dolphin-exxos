@@ -153,10 +153,23 @@ here — see `THEME-LOG.md`.
 
 ## Credits and licence
 
-Dolphin is by the KDE community, GPL-2.0-or-later; the patches keep that
-licence. The Windows 7 artwork is other people's work, collected from the KDE
-store — it is used here, not authored here, and the icon theme in particular
-is not redistributed for that reason.
+**Dolphin** is by the KDE community, GPL-2.0-or-later. The patches here keep
+that licence.
+
+**The icon theme** is by **Blackcrack** (<https://www.blackysgate.de>), licensed
+**CC BY-NC-SA** — Attribution, NonCommercial, ShareAlike. It is redistributed
+here under those terms: the author is credited, the licence is unchanged, and
+the theme's own `COPYING`, `AUTHORS` and `Readme.md` ship inside it. Two
+consequences follow and are worth stating plainly — this package **may not be
+sold**, or bundled with anything sold, and anyone redistributing a modified
+icon set must do so under the same licence.
+
+Modifications made to it: a handful of icons containing embedded bitmap images
+were dropped for size, editor metadata was stripped, and leftover files from
+this machine's own repairs were removed. No artwork was redrawn.
+
+**The window decorations, Plasma theme and colour scheme** were collected from
+the KDE store and are used here, not authored here.
 
 Windows and Windows 7 are trademarks of Microsoft Corporation. This project is
 not connected with Microsoft in any way; it reproduces the *behaviour* people
