@@ -47,15 +47,23 @@ A patched Dolphin 22.12.3 with the Explorer drive view Plasma does not have.
 * **Mount and eject** from a drive's context menu, and an optional auto-mount
   that states plainly what the risk is before you switch it on.
 
-### The Windows 7 theme
+### The theme
 
-Window decorations, Plasma theme, colour scheme and Start menu styling.
+Window decorations, Plasma theme, colour scheme, Start menu styling and a
+classic Windows-style icon set.
 Installed by the package; applied per user with `exxos-theme-apply`, because a
 theme lives in your own configuration and a package installs for everybody.
 
-The 460 MB Win7 icon theme is **not** bundled — it is someone else's work and
-far too large. `exxos-theme-apply` says so if it is missing rather than leaving
-the desktop looking half-finished.
+The icon theme is in **`exxos-icons`**, which apt installs alongside the
+desktop package by default, so it looks right from the first login rather than
+falling back to Breeze. It is kept as a separate package because it is 385 MB
+installed — twenty times everything else here — and the desktop works without
+it if you would rather not have it.
+
+The artwork is by Blackcrack (blackysgate.de) under CC BY-NC-SA. That licence
+allows it to be redistributed, including modified, **provided the author is
+credited and the same licence is kept** — so the credit stays in the package
+and is not something that can be dropped.
 
 ## Installing
 
@@ -142,16 +150,6 @@ the package and the git tag cannot disagree.
 `deploy.sh` prints the binary and worker actually running afterwards, because
 testing against a stale build is the single most expensive mistake available
 here — see `THEME-LOG.md`.
-
-## Where the rest of the project lives
-
-This repository holds the patched Dolphin, and the apt repository is published
-from its `gh-pages` branch. The theme files, the `computer:/` worker source,
-the packaging scripts and the development log are not in here yet -- they live
-alongside it and are being moved in. Until then this repository builds Dolphin
-but not the whole `.deb`.
-
-Upstream Dolphin's own README is kept as `README.upstream.md`.
 
 ## Credits and licence
 
