@@ -1812,6 +1812,16 @@ QHash<QByteArray, QVariant> KFileItemModel::retrieveData(const KFileItem& item, 
                 data.insert(sharedValue("totalSpace"), totalBytes);
             }
         }
+        /* And the device's Solid UDI, for the same reason and by the same
+           route: it is what lets a tile know which physical drive it is
+           showing, so a spinner can be drawn on the one that is actually
+           being read. It cannot be recovered from the item name -- computer:/
+           builds that by replacing '/' with '_' and real UDIs contain
+           underscores. */
+        const QString udi = e.stringValue(KIO::UDSEntry::UDS_EXTRA + 2);
+        if (!udi.isEmpty()) {
+            data.insert(sharedValue("deviceUdi"), udi);
+        }
     }
 
     const bool isDir = item.isDir();

@@ -40,6 +40,7 @@ DolphinStatusBar::DolphinStatusBar(QWidget* parent) :
     m_stopButton(nullptr),
     m_progress(100),
     m_showProgressBarTimer(nullptr),
+    m_exxosBusyHoldTimer(nullptr),
     m_delayUpdateTimer(nullptr),
     m_textTimestamp()
 {
@@ -84,6 +85,10 @@ DolphinStatusBar::DolphinStatusBar(QWidget* parent) :
     m_showProgressBarTimer->setInterval(500);
     m_showProgressBarTimer->setSingleShot(true);
     connect(m_showProgressBarTimer, &QTimer::timeout, this, &DolphinStatusBar::updateProgressInfo);
+
+    m_exxosBusyHoldTimer = new QTimer(this);
+    m_exxosBusyHoldTimer->setSingleShot(true);
+    connect(m_exxosBusyHoldTimer, &QTimer::timeout, this, &DolphinStatusBar::updateProgressInfo);
 
     // initialize text updater delay timer
     m_delayUpdateTimer = new QTimer(this);
@@ -291,8 +296,28 @@ void DolphinStatusBar::showZoomSliderToolTip(int zoomLevel)
     QApplication::sendEvent(m_zoomSlider, &toolTipEvent);
 }
 
+void DolphinStatusBar::exxosShowBusy(const QString& text, int holdMs)
+{
+    m_progressTextLabel->setText(text);
+    m_progressBar->setMaximum(0);      // indeterminate: nobody reports a percentage
+    m_progressBar->setValue(0);
+    m_progress = 0;
+    m_showProgressBarTimer->stop();    // no delay; the point is to be seen
+    m_exxosBusyHoldTimer->start(holdMs);
+    updateProgressInfo();
+}
+
 void DolphinStatusBar::updateProgressInfo()
 {
+    if (m_exxosBusyHoldTimer && m_exxosBusyHoldTimer->isActive()) {
+        // Held: show it, and do not let a fast completion take it away again
+        // before it has been on screen long enough to read.
+        m_stopButton->show();
+        m_progressTextLabel->show();
+        m_progressBar->show();
+        setExtensionsVisible(false);
+        return;
+    }
     if (m_progress < 100) {
         // Show the progress information and hide the extensions
         m_stopButton->show();

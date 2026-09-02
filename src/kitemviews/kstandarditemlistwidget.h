@@ -131,6 +131,10 @@ public:
     QFont exxosTileFont() const;
     /** Slightly smaller: the hardware line and the free-space line. */
     QFont exxosTileSmallFont() const;
+    /** The Solid UDI of the drive this tile shows, or empty. */
+    QString exxosDeviceUdi() const;
+    /** A turning ring of dots over the icon while that drive is being read. */
+    void exxosDrawBusySpinner(QPainter* painter) const;
 
 protected:
     /**

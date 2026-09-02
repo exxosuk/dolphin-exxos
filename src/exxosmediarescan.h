@@ -53,4 +53,91 @@ enum Scope {
 DOLPHIN_EXPORT void rescanRemovable(Scope scope = AllRemovable);
 }
 
+#include <QHash>
+#include <QObject>
+#include <QString>
+
+/**
+ * Watches for a disk being put in or taken out, using the kernel as the source
+ * of truth.
+ *
+ * WHY NOT JUST LISTEN TO SOLID.  Because udisks does not always hear about it.
+ * With a floppy physically in the drive:
+ *
+ *     /sys/block/sdg/size      1440      <- the kernel
+ *     udisks Block.Size        0         <- udisks, indefinitely
+ *
+ * so a disk swapped while Dolphin was running was never noticed, while one
+ * already in the drive at start-up was picked up -- because start-up reads
+ * everything fresh. That is exactly the reported behaviour.
+ *
+ * /sys/block/<dev>/size is the kernel's own answer and costs nothing to read:
+ * it is a few bytes of already-known state, NOT a read of the disk, so this
+ * can be polled every couple of seconds without touching the drive at all.
+ *
+ * When a size actually changes, and only then, udisks is asked to re-examine
+ * that one device -- which is the moment a rescan is justified, rather than on
+ * a timer the way it was being done before.
+ */
+class DOLPHIN_EXPORT ExxosMediaWatch : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit ExxosMediaWatch(QObject *parent = nullptr);
+
+    /** Begin watching. Reads the current sizes first, so start-up is not
+     *  reported as a change. */
+    void start();
+
+Q_SIGNALS:
+    /** A drive gained or lost a medium. @p device is e.g. "sdg". */
+    void mediaChanged(const QString &device, bool inserted);
+
+private:
+    void poll();
+
+    QHash<QString, qulonglong> m_sizes;
+    bool m_primed = false;
+};
+
+#include <QSet>
+
+/**
+ * Which drives are being worked on, so a tile can say so.
+ *
+ * A single bar at the bottom of the window tells you SOMETHING is happening
+ * but not what; a mark on the drive itself does. This keeps the set of busy
+ * devices and ticks a phase counter while any of them are, which is all a
+ * widget needs to draw a spinner.
+ *
+ * The timer only runs while something is busy, so an idle window costs
+ * nothing at all.
+ */
+class DOLPHIN_EXPORT ExxosBusySpinner : public QObject
+{
+    Q_OBJECT
+
+public:
+    static ExxosBusySpinner *instance();
+
+    /** @p udi is the Solid UDI, as carried in the "deviceUdi" role. */
+    void setBusy(const QString &udi, bool busy);
+    bool isBusy(const QString &udi) const;
+
+    /** Advances while anything is busy; the angle of the spinner. */
+    int phase() const { return m_phase; }
+
+Q_SIGNALS:
+    /** A frame has passed. Widgets showing a busy drive should repaint. */
+    void tick();
+
+private:
+    explicit ExxosBusySpinner(QObject *parent = nullptr);
+
+    QSet<QString> m_busy;
+    int m_phase = 0;
+    class QTimer *m_timer = nullptr;
+};
+
 #endif // EXXOSMEDIARESCAN_H

@@ -6,6 +6,10 @@
 
 #include "kstandarditemlistwidget.h"
 
+#include "exxosmediarescan.h"
+
+#include <cmath>
+
 #include <KIO/Global>          // KIO::convertSize, for the tile view free-space text
 #include <KLocalizedString>    // i18nc, for the tile view free-space text
 
@@ -303,6 +307,55 @@ KStandardItemListWidget::KStandardItemListWidget(KItemListWidgetInformant* infor
     m_roleEditor(nullptr),
     m_oldRoleEditor(nullptr)
 {
+    /* Exxos/Win7: repaint while this drive is being worked on, so the spinner
+       turns. Connected once per widget; the timer behind it only runs while
+       something is actually busy, so an idle view costs nothing. */
+    connect(ExxosBusySpinner::instance(), &ExxosBusySpinner::tick, this, [this]() {
+        if (m_isTile && ExxosBusySpinner::instance()->isBusy(exxosDeviceUdi())) {
+            update();
+        }
+    });
+}
+
+/* The physical drive this tile is showing, or empty for anything else. */
+QString KStandardItemListWidget::exxosDeviceUdi() const
+{
+    return data().value("deviceUdi").toString();
+}
+
+/* A small ring of fading dots over the icon, turning while the drive is read.
+
+   Explorer puts a spinner on the item it is working on rather than only in the
+   status bar, which answers "is it doing anything?" and "to what?" at once.
+   Drawn over the icon, sized to it, so it cannot collide with the text. */
+void KStandardItemListWidget::exxosDrawBusySpinner(QPainter* painter) const
+{
+    const QRectF icon(m_pixmapPos, QSizeF(m_scaledPixmapSize));
+    if (icon.isEmpty()) {
+        return;
+    }
+    const qreal radius = qMin(icon.width(), icon.height()) * 0.30;
+    const QPointF centre = icon.center();
+    const qreal dotR = qMax(qreal(1.2), radius * 0.20);
+    const int phase = ExxosBusySpinner::instance()->phase();
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setPen(Qt::NoPen);
+    /* A disc behind it, so the dots stay legible over a busy icon. */
+    painter->setBrush(QColor(255, 255, 255, 190));
+    painter->drawEllipse(centre, radius + dotR * 1.6, radius + dotR * 1.6);
+
+    for (int i = 0; i < 8; ++i) {
+        const qreal angle = (i * 45.0 - phase * 30.0) * M_PI / 180.0;
+        const QPointF p(centre.x() + radius * std::cos(angle),
+                        centre.y() + radius * std::sin(angle));
+        // Brightest at the leading dot, fading round the ring.
+        const int alpha = 40 + (215 * (7 - i)) / 7;
+        painter->setBrush(QColor(15, 136, 165, alpha));
+        painter->drawEllipse(p, dotR, dotR);
+    }
+    painter->restore();
 }
 
 KStandardItemListWidget::~KStandardItemListWidget()
@@ -445,6 +498,9 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
        background and any selection highlight. */
     if (m_isTile) {
         drawCapacityBar(painter);
+        if (ExxosBusySpinner::instance()->isBusy(exxosDeviceUdi())) {
+            exxosDrawBusySpinner(painter);
+        }
         if (!m_exxosLabelText.text().isEmpty()) {
             painter->setFont(exxosTileSmallFont());
             painter->drawStaticText(m_exxosLabelTextPos, m_exxosLabelText);

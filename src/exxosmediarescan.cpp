@@ -91,3 +91,115 @@ void ExxosMediaRescan::rescanRemovable(Scope scope)
         bus.asyncCall(call);
     }
 }
+
+/* ------------------------------------------------------------------------ */
+
+#include <QTimer>
+
+ExxosMediaWatch::ExxosMediaWatch(QObject *parent)
+    : QObject(parent)
+{
+}
+
+void ExxosMediaWatch::start()
+{
+    poll();               // prime: whatever is there now is not a "change"
+    m_primed = true;
+
+    auto *timer = new QTimer(this);
+    timer->setInterval(2000);
+    connect(timer, &QTimer::timeout, this, &ExxosMediaWatch::poll);
+    timer->start();
+}
+
+void ExxosMediaWatch::poll()
+{
+    const QStringList devices = QDir(QStringLiteral("/sys/block"))
+                                    .entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &name : devices) {
+        if (!name.startsWith(QLatin1String("sd"))
+            && !name.startsWith(QLatin1String("fd")) && !name.startsWith(QLatin1String("mmcblk"))) {
+            continue;
+        }
+        // Optical drives are left to the kernel's own polling, which works,
+        // and must never be rescanned -- that closes the tray.
+        if (!isRemovable(name)) {
+            continue;
+        }
+
+        QFile f(QStringLiteral("/sys/block/%1/size").arg(name));
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            continue;
+        }
+        const qulonglong size = f.readAll().trimmed().toULongLong();
+
+        const auto it = m_sizes.constFind(name);
+        const bool known = (it != m_sizes.constEnd());
+        if (known && *it == size) {
+            continue;
+        }
+        m_sizes.insert(name, size);
+        if (!known || !m_primed) {
+            continue;                    // first sighting is not a change
+        }
+
+        /* Now, and only now, is a rescan worth doing: something really has
+           changed and udisks may not have noticed. */
+        QDBusConnection bus = QDBusConnection::systemBus();
+        if (bus.isConnected()) {
+            QDBusMessage call = QDBusMessage::createMethodCall(
+                QStringLiteral("org.freedesktop.UDisks2"),
+                QStringLiteral("/org/freedesktop/UDisks2/block_devices/%1").arg(name),
+                QStringLiteral("org.freedesktop.UDisks2.Block"),
+                QStringLiteral("Rescan"));
+            call << QVariant::fromValue(QVariantMap());
+            bus.asyncCall(call);
+        }
+        Q_EMIT mediaChanged(name, size > 0);
+    }
+}
+
+/* ------------------------------------------------------------------------ */
+
+ExxosBusySpinner *ExxosBusySpinner::instance()
+{
+    static ExxosBusySpinner self;
+    return &self;
+}
+
+ExxosBusySpinner::ExxosBusySpinner(QObject *parent)
+    : QObject(parent)
+{
+    m_timer = new QTimer(this);
+    m_timer->setInterval(80);          // 12.5 frames a second is plenty
+    connect(m_timer, &QTimer::timeout, this, [this]() {
+        m_phase = (m_phase + 1) % 12;
+        Q_EMIT tick();
+    });
+}
+
+void ExxosBusySpinner::setBusy(const QString &udi, bool busy)
+{
+    if (udi.isEmpty()) {
+        return;
+    }
+    const bool had = !m_busy.isEmpty();
+    if (busy) {
+        m_busy.insert(udi);
+    } else {
+        m_busy.remove(udi);
+    }
+    const bool has = !m_busy.isEmpty();
+    if (has && !had) {
+        m_phase = 0;
+        m_timer->start();
+    } else if (!has && had) {
+        m_timer->stop();
+    }
+    Q_EMIT tick();                     // repaint immediately on the change
+}
+
+bool ExxosBusySpinner::isBusy(const QString &udi) const
+{
+    return !udi.isEmpty() && m_busy.contains(udi);
+}

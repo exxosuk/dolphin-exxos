@@ -244,6 +244,76 @@ DolphinMainWindow::DolphinMainWindow() :
     });
     autoMountWatch->start();
 
+    /* Exxos/Win7: watch for a disk going in or coming out.
+
+       The kernel is the source of truth here, not udisks -- see
+       ExxosMediaWatch for the measurement. When something changes, the drive
+       it happened on is marked busy so its tile shows a spinner, the status
+       bar says what is going on, and the view is re-listed once udisks has had
+       a moment to catch up. */
+    auto *mediaWatch = new ExxosMediaWatch(this);
+    connect(mediaWatch, &ExxosMediaWatch::mediaChanged, this,
+            [this](const QString &device, bool inserted) {
+        const QString udi = QStringLiteral("/org/freedesktop/UDisks2/block_devices/") + device;
+        ExxosBusySpinner::instance()->setBusy(udi, true);
+
+        if (m_activeViewContainer) {
+            m_activeViewContainer->statusBar()->exxosShowBusy(
+                inserted ? i18nc("@info:progress", "Reading disc...")
+                         : i18nc("@info:progress", "Checking drives..."), 2500);
+        }
+
+        /* Two passes. udisks may need a moment to notice, and on a removal it
+           takes longer still to drop the volume, so refresh promptly and then
+           confirm -- the same reasoning as scheduleComputerReload(). */
+        QTimer::singleShot(1200, this, [this]() {
+            if (m_activeViewContainer
+                && m_activeViewContainer->url().scheme() == QLatin1String("computer")) {
+                m_activeViewContainer->view()->reload();
+            }
+        });
+        QTimer::singleShot(3000, this, [this, udi]() {
+            if (m_activeViewContainer
+                && m_activeViewContainer->url().scheme() == QLatin1String("computer")) {
+                m_activeViewContainer->view()->reload();
+            }
+            ExxosBusySpinner::instance()->setBusy(udi, false);
+        });
+    });
+    mediaWatch->start();
+
+    /* One rescan at start-up, and only one.
+
+       The watch primes itself with whatever is in the drives now, so it cannot
+       report a disk that was already there as a change -- and if udisks was
+       stale when Dolphin started, nothing would ever correct it. This is the
+       "floppy already in the drive when Dolphin opens" case. One read of the
+       drive at start-up is a fair price; doing it on a timer was not. */
+    QTimer::singleShot(900, this, []() {
+        ExxosMediaRescan::rescanRemovable(ExxosMediaRescan::AllRemovable);
+    });
+
+    /* EXXOS_SPIN_TEST=1 marks every removable drive busy for twenty seconds,
+       so the spinner can be looked at without waiting for a real disk change.
+       Kept in: it is the only way to check that drawing without physically
+       swapping media, and it costs nothing when the variable is unset. */
+    if (qEnvironmentVariableIsSet("EXXOS_SPIN_TEST")) {
+        QTimer::singleShot(2500, this, []() {
+            const auto devices = Solid::Device::listFromType(
+                Solid::DeviceInterface::StorageAccess, QString());
+            for (const Solid::Device &dev : devices) {
+                ExxosBusySpinner::instance()->setBusy(dev.udi(), true);
+            }
+        });
+        QTimer::singleShot(22500, this, []() {
+            const auto devices = Solid::Device::listFromType(
+                Solid::DeviceInterface::StorageAccess, QString());
+            for (const Solid::Device &dev : devices) {
+                ExxosBusySpinner::instance()->setBusy(dev.udi(), false);
+            }
+        });
+    }
+
     /* Exxos/Win7: populate Network in the background, so it is already filled
        in by the time anyone clicks it. Deferred rather than immediate: the
        probe is harmless but start-up should not wait on the network. */

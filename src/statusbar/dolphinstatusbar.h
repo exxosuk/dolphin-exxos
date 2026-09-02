@@ -50,6 +50,18 @@ public:
      * the progress is not shown at all.
      */
     void setProgress(int percent);
+
+    /**
+     * Exxos/Win7: show a "working on it" bar straight away and keep it up for
+     * a moment, whatever else happens.
+     *
+     * setProgress() deliberately DELAYS the bar by half a second and drops it
+     * the instant progress reaches 100, so anything quick never appears at
+     * all. Reading the drives usually is quick -- and when it is not, that is
+     * exactly when the user needs to be told something is happening. This
+     * shows it now and holds it, so it cannot flash past unseen.
+     */
+    void exxosShowBusy(const QString& text, int holdMs = 1200);
     int progress() const;
 
     /**
@@ -134,6 +146,7 @@ private:
     QToolButton* m_stopButton;
     int m_progress;
     QTimer* m_showProgressBarTimer;
+    QTimer* m_exxosBusyHoldTimer;   // while active, the bar stays up
 
     QTimer* m_delayUpdateTimer;
     QTime m_textTimestamp;

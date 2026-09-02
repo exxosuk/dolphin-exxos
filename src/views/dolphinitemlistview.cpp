@@ -148,14 +148,18 @@ void DolphinItemListView::onItemLayoutChanged(ItemLayout current, ItemLayout pre
 void DolphinItemListView::onPreviewsShownChanged(bool shown)
 {
     Q_UNUSED(shown)
+    exxosBeginLayoutSwitch();   // a settings change, not a zoom
     updateGridSize();
+    exxosEndLayoutSwitch();
 }
 
 void DolphinItemListView::onVisibleRolesChanged(const QList<QByteArray>& current,
                                                 const QList<QByteArray>& previous)
 {
     KFileItemListView::onVisibleRolesChanged(current, previous);
+    exxosBeginLayoutSwitch();   // a settings change, not a zoom
     updateGridSize();
+    exxosEndLayoutSwitch();
 }
 
 void DolphinItemListView::updateFont()
@@ -217,7 +221,17 @@ void DolphinItemListView::slotCapacityItemsMayHaveChanged()
     const bool now = viewHasCapacityItems();
     if (now != m_hasCapacityItems) {
         m_hasCapacityItems = now;
+        /* Not a zoom, so it must not look like one.
+
+           A tile grid uses a different icon size from an ordinary grid, so
+           this flip changes the icon size -- and putting a disc in or taking
+           one out empties and refills the model, flipping it twice. The icons
+           then GREW into place exactly as if the zoom slider had been dragged,
+           on every single media change. A refresh should just redraw. */
+        exxosBeginLayoutSwitch();
         updateGridSize();
+        exxosEndLayoutSwitch();
+        return;
     }
 }
 
