@@ -488,8 +488,8 @@ QVector<Drive> enumerateDrives()
    "Network Locations" so computer:/ has the same Network node Explorer does.
 
    Why a shortcut rather than enumerating shares here: browsing SMB requires
-   credentials per host - verified, `smb://CHRIS` lists its shares but
-   `smb://exxos_nas` returns "Access denied" - and a network browse can block for
+   credentials per host - some hosts refuse anonymous listing - and a network
+   browse can block for
    many seconds. listDir() is synchronous, so doing that here would stall the
    whole computer:/ view on every open. remote:/ already handles browsing,
    authentication and caching properly, so this defers to it.
@@ -718,8 +718,8 @@ int categoryKey(const Drive &d)
 }
 
 /* The user-visible line, e.g.
-     "WIN7 (ntfs) — 520.8GB free of 931.6GB"
-     "DGHJ (ntfs) — not mounted"                                        */
+     "System (ntfs) — 520.8GB free of 931.6GB"
+     "Data (ntfs) — not mounted"                                        */
 QString describe(const Drive &d)
 {
     /* Two halves, separated by an em dash: what the HARDWARE is, and what is
@@ -728,7 +728,7 @@ QString describe(const Drive &d)
        usually the label, the half that says which disk this is.
 
            "Generic STORAGE DEVICE \u2014 [no label]"
-           "Samsung SSD 870 QVO 1TB \u2014 QVO BACKUP (ntfs)"
+           "Samsung SSD 870 QVO 1TB \u2014 Backup (ntfs)"
            "CD-RW/DVD\u00B1RW DL Drive \u2014 No disc"
            "External Floppy Drive \u2014 [no label], not mounted"
 
@@ -762,8 +762,8 @@ QString describe(const Drive &d)
 
     /* WHICH half goes first depends on whether the medium has a name.
 
-       When it does, that name is what the user is looking for -- "WIN7",
-       "GAMES3" -- so it leads, in bold, with the drive model underneath as
+       When it does, that name is what the user is looking for -- so it
+       leads, in bold, with the drive model underneath as
        supporting detail. When it does not, the only identity available is the
        hardware, so that leads instead and the second line says what the state
        is: "[no label]", "No disc", "Empty". Putting "Empty" in bold above the

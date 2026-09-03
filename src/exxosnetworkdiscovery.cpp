@@ -70,7 +70,7 @@ QString nameFromReply(const QByteArray &datagram)
     if (!m.hasMatch()) {
         return QString();
     }
-    // e.g. "http://exxos_nas:5357/aaafe1b8-..." -> "exxos_nas"
+    // e.g. "http://my_nas:5357/aaafe1b8-..." -> "my_nas"
     const QString url = m.captured(1).trimmed().section(QLatin1Char(' '), 0, 0);
     QString host = url.section(QStringLiteral("//"), 1).section(QLatin1Char('/'), 0, 0);
     host = host.section(QLatin1Char(':'), 0, 0);

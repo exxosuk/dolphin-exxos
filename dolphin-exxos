@@ -25,9 +25,7 @@ fi
 # KIO spawns a worker as `kioslave5 <absolute path to the .so> computer ...`,
 # and the path is resolved through the Qt plugin path of the process that
 # spawns it. Setting QT_PLUGIN_PATH here is therefore enough for our Dolphin to
-# load a worker out of the user's own home -- verified: the spawned process ran
-#
-#   /home/chris/.local/lib/qt5/plugins/kf5/kio/computer.so
+# load a worker out of the user's own home.
 #
 # So the root-owned copy under /usr/lib is no longer needed for this build. It
 # is left alone (install.sh still maintains it) only so that OTHER

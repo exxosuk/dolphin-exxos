@@ -1795,7 +1795,7 @@ void KStandardItemListWidget::updateTilesLayoutTextCache()
 
        The worker sends one string, "<hardware> - <medium>", e.g.
            "Generic STORAGE DEVICE - [no label]"
-           "Samsung SSD 870 QVO 1TB - QVO BACKUP (ntfs)"
+           "Samsung SSD 870 QVO 1TB - Backup (ntfs)"
        and sharing one line meant whichever half came second was clipped --
        usually the label, which is the half that identifies the disk. */
     const QString wholeName = roleText("text", values);

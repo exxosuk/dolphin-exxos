@@ -21,7 +21,7 @@ class QUdpSocket;
  * and Windows box announces itself over WS-Discovery, and the announcement
  * carries a NAME, not an address:
  *
- *     XAddrs: http://exxos_nas:5357/aaafe1b8-7fd4-4f01-8705-f1b9eb6b084b
+ *     XAddrs: http://my_nas:5357/aaafe1b8-7fd4-4f01-8705-f1b9eb6b084b
  *
  * Windows resolves such names over NetBIOS and LLMNR. Debian resolves neither
  * unless winbind is installed and `wins` is added to /etc/nsswitch.conf, so
