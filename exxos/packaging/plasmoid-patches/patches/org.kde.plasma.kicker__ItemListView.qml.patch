@@ -1,0 +1,26 @@
+--- a/contents/ui/ItemListView.qml
++++ b/contents/ui/ItemListView.qml
+@@ -13,6 +13,24 @@
+ FocusScope {
+     id: itemList
+
++    // --- LOCAL OVERRIDE (theme work 2026-08-30) ---------------------------
++    // Submenus are separate Kicker.SubMenu dialogs whose mainItem is this
++    // ItemListView, so they were still drawn on the Plasma theme's translucent
++    // glass while ItemListDelegate had already been switched to dark text -
++    // dark-on-glass, i.e. unreadable. Painting the backdrop here covers the
++    // root list AND every submenu with the same flat colour, so they match.
++    // Colour sampled from menu7.PNG: (244,244,247).
++    // Revert: rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.kicker
++    Rectangle {
++        id: win7ListBackdrop
++        anchors.fill: parent
++        anchors.margins: -PlasmaCore.Units.smallSpacing
++        color: "#f4f4f7"
++        border.color: "#9a9a9a"
++        border.width: 1
++        z: -1
++    }
++
+     property real minimumWidth: PlasmaCore.Units.gridUnit * 14
+     property real maximumWidth: minimumWidth * 2

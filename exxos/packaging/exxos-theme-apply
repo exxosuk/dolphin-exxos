@@ -21,8 +21,23 @@ SRC=/usr/share/exxos
 undo() {
     kwriteconfig5 --file kdeglobals --group General --key ColorScheme BreezeLight
     kwriteconfig5 --file kdeglobals --group Icons --key Theme breeze
+    kwriteconfig5 --file kdeglobals --group KDE --key widgetStyle Breeze
+    kwriteconfig5 --file kdeglobals --group KDE --key LookAndFeelPackage org.kde.breeze.desktop
     kwriteconfig5 --file plasmarc  --group Theme  --key name default
     kwriteconfig5 --file kwinrc    --group org.kde.kdecoration2 --key library org.kde.breeze
+    kwriteconfig5 --file kwinrc    --group org.kde.kdecoration2 --key theme ""
+    kwriteconfig5 --file kwinrc    --group org.kde.kdecoration2 --key ButtonsOnLeft MS
+    kwriteconfig5 --file kwinrc    --group org.kde.kdecoration2 --key ButtonsOnRight HIAX
+    kwriteconfig5 --file kwinrc    --group Plugins --key blurEnabled false
+    kwriteconfig5 --file kwinrc    --group Plugins --key diminactiveEnabled --delete
+    kwriteconfig5 --file kwinrc    --group Windows --key Placement --delete
+    # remove plasmoid overrides
+    rm -rf "$HOME/.local/share/plasma/plasmoids/org.kde.plasma.icon" \
+           "$HOME/.local/share/plasma/plasmoids/org.kde.plasma.showdesktop" \
+           "$HOME/.local/share/plasma/plasmoids/org.kde.plasma.kicker" \
+           "$HOME/.local/share/plasma/plasmoids/org.kde.plasma.taskmanager" 2>/dev/null
+    rm -f "$HOME/.config/autostart/exxos-plasmoid-check.desktop" 2>/dev/null
+    rm -f "$HOME/.cache/plasma-svgelements"* "$HOME/.cache/plasma_theme_"*.kcache 2>/dev/null
     echo "Breeze restored. Log out and back in."
     exit 0
 }
@@ -53,22 +68,31 @@ echo "Applying settings..."
 # Dolphin shows the places panel by default, so a fresh install already has it.
 # It only disappears if somebody switches it off (F9, "Show Panels"), and that
 # choice is theirs to keep.
-#
-# Deleting the [MainWindow] State blob was tried as a way to force it back and
-# it does NOT work -- the panel stayed hidden -- while the blob also holds the
-# window size and toolbar layout, which people arrange on purpose. F9 restores
-# it in one keystroke; a theme script has no business overruling that.
 
+# --- colour scheme and plasma style ---
 kwriteconfig5 --file kdeglobals --group General --key ColorScheme Exxos
 kwriteconfig5 --file plasmarc   --group Theme   --key name Se7enAeroStyle
-kwriteconfig5 --file kwinrc     --group org.kde.kdecoration2 --key library org.kde.kwin.aurorae
-kwriteconfig5 --file kwinrc     --group org.kde.kdecoration2 --key theme __aurorae__svg__exposeair
 
-# The icon theme normally arrives with the exxos-icons package, but it may
-# also have been dropped into the user's own icon directory by hand, so look
-# in both. Without it the desktop is not broken, it just falls back to Breeze
-# and does not look like the thing it is meant to look like -- worth saying
-# rather than leaving someone to wonder.
+# --- widget style (plastique, not cde -- cde lacks menu hover highlight) ---
+kwriteconfig5 --file kdeglobals --group KDE --key widgetStyle plastique
+
+# --- window decoration: Aurorae exposeair with Win7 button layout ---
+kwriteconfig5 --file kwinrc --group org.kde.kdecoration2 --key library org.kde.kwin.aurorae
+kwriteconfig5 --file kwinrc --group org.kde.kdecoration2 --key theme __aurorae__svg__exposeair
+kwriteconfig5 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnLeft ""
+kwriteconfig5 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnRight IAX
+
+# --- compositor: blur on, dim-inactive off (Win7 does not dim) ---
+kwriteconfig5 --file kwinrc --group Plugins --key blurEnabled true
+kwriteconfig5 --file kwinrc --group Plugins --key diminactiveEnabled false
+
+# --- window placement: centred, not Smart (which drifts left) ---
+kwriteconfig5 --file kwinrc --group Windows --key Placement Centered
+
+# --- mark this as the active Global Theme ---
+kwriteconfig5 --file kdeglobals --group KDE --key LookAndFeelPackage com.exxos.win7
+
+# --- icon theme ---
 ICON_NAME=Win7-plasma5up-scalable-icontheme-blackysgate.de
 if [ -d "/usr/share/icons/$ICON_NAME" ] || [ -d "$HOME/.local/share/icons/$ICON_NAME" ]; then
     kwriteconfig5 --file kdeglobals --group Icons --key Theme "$ICON_NAME"
@@ -79,6 +103,40 @@ else
     echo "    Install it with:  sudo apt install exxos-icons"
 fi
 
+# --- plasmoid patches (start menu, quick-launch spacing, taskbar layout) ---
+PATCH_DIR="$SRC/plasma/look-and-feel/com.exxos.win7/bundle/plasmoid-patches"
+if [ -f "$PATCH_DIR/rebuild-overrides.sh" ]; then
+    echo
+    echo "Applying panel widget patches..."
+    if bash "$PATCH_DIR/rebuild-overrides.sh"; then
+        echo "  + panel patches applied"
+    else
+        echo "  ! Some patches did not apply -- those widgets keep stock behaviour."
+        echo "    See: $PATCH_DIR/README.md"
+    fi
+
+    # set up login-time check so patches are rebuilt after Plasma upgrades
+    mkdir -p "$HOME/.config/autostart"
+    cat > "$HOME/.config/autostart/exxos-plasmoid-check.desktop" <<AUTOSTART
+[Desktop Entry]
+Type=Application
+Name=Exxos panel widget check
+Comment=Rebuild the Exxos plasmoid overrides if Plasma has been upgraded
+Exec=$PATCH_DIR/check-on-login.sh
+Terminal=false
+X-KDE-autostart-phase=2
+NoDisplay=true
+AUTOSTART
+    echo "  + login check installed (auto-rebuilds after Plasma upgrades)"
+else
+    echo
+    echo "  ! Plasmoid patches not found at $PATCH_DIR"
+    echo "    Start menu and quick-launch spacing will stay stock."
+fi
+
+# --- clear Plasma theme caches so the new theme renders immediately ---
+rm -f "$HOME/.cache/plasma-svgelements"* "$HOME/.cache/plasma_theme_"*.kcache "$HOME/.cache/icon-cache.kcache" 2>/dev/null
+
 echo
-echo "Done. Log out and back in for the window decorations to take effect."
+echo "Done. Log out and back in for the full effect."
 echo "Undo with: exxos-theme-apply --undo"

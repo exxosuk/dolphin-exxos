@@ -1,0 +1,27 @@
+--- a/contents/ui/MenuRepresentation.qml
++++ b/contents/ui/MenuRepresentation.qml
+@@ -49,6 +49,24 @@
+         searchField.focus = true;
+     }
+ 
++    // --- LOCAL OVERRIDE (theme work 2026-08-30) ---------------------------
++    // Match menu7.PNG: the Windows Classic Start Menu is FLAT and OPAQUE,
++    // sampled at (244,244,247) across 88-97% of its area - no glass at all.
++    // The Plasma theme's dialogs/background.svg is shared by every Plasma
++    // popup AND the panel shares its colour group, so recolouring the theme
++    // made panel text dark-on-dark. Painting the backdrop here instead keeps
++    // the change contained to this menu.
++    // Revert: rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.kicker
++    Rectangle {
++        id: win7Backdrop
++        anchors.fill: parent
++        anchors.margins: -units.smallSpacing
++        color: "#f4f4f7"
++        border.color: "#9a9a9a"
++        border.width: 1
++        z: -1
++    }
++
+     Row {
+         id: mainRow
+ 

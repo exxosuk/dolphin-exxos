@@ -1,0 +1,34 @@
+--- a/contents/ui/main.qml
++++ b/contents/ui/main.qml
+@@ -43,10 +43,29 @@
+     Accessible.description: toolTip.subText
+     Accessible.role: Accessible.Button
+
+-    Layout.minimumWidth: Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? height : PlasmaCore.Units.iconSizes.small
++    // --- LOCAL OVERRIDE (theme work, 2026-08-30) -----------------------------
++    // Upstream hardcodes this applet square to the panel height in a horizontal
++    // panel:
++    //     Layout.minimumWidth: formFactor === Horizontal ? height : ...
++    // On a 48px panel that forces a ~50px slot around a 32px icon, i.e. ~20px
++    // gaps between quick-launch icons, with NO setting anywhere to change it.
++    //
++    // compactSlot narrows the slot without shrinking the icon. PlasmaCore.
++    // IconItem fills the applet and snaps to the largest standard icon size
++    // that fits, so 36 still yields a 32px icon while cutting the gap to ~9px.
++    // Measured: slot 50 -> gaps 22px | slot 40 -> 13px | slot 36 -> 9px, icon
++    // stays 32px at 40, 38 and 36; at 24 the icon drops to 22px. 38 chosen for a
++    // slightly roomier look than 36.
++    //
++    // Revert: rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.icon
++    // then quit and restart plasmashell.
++    readonly property int compactSlot: 38
++
++    Layout.minimumWidth: Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? compactSlot : PlasmaCore.Units.iconSizes.small
++    Layout.preferredWidth: Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? compactSlot : -1
+     Layout.minimumHeight: Plasmoid.formFactor === PlasmaCore.Types.Vertical ? width : (PlasmaCore.Units.iconSizes.small + 2 * PlasmaCore.Theme.mSize(PlasmaCore.Theme.defaultFont).height)
+
+-    Layout.maximumWidth: inPanel ? PlasmaCore.Units.iconSizeHints.panel : -1
++    Layout.maximumWidth: inPanel ? (Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? compactSlot : PlasmaCore.Units.iconSizeHints.panel) : -1
+     Layout.maximumHeight: inPanel ? PlasmaCore.Units.iconSizeHints.panel : -1
+
+     hoverEnabled: true

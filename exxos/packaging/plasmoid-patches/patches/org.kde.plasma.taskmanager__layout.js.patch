@@ -1,0 +1,55 @@
+--- a/contents/ui/code/layout.js
++++ b/contents/ui/code/layout.js
+@@ -103,6 +103,39 @@
+ function preferredMinWidth() {
+     var width = launcherWidth();
+
++    // --- LOCAL OVERRIDE (theme work) -------------------------------------
++    // Upstream reserves 12 characters of text width per task button as a hard
++    // floor. With "Maximum rows" set to 1 that floor is reached quickly, and
++    // any further windows overflow off the end of the panel where they cannot
++    // be clicked at all.
++    //
++    // Windows 7 instead keeps shrinking the buttons, dropping the text and
++    // ending at a plain icon square, so everything stays reachable in one row.
++    // Task.qml already hides its label once the button is narrower than
++    // minimumMColumns() (5) characters, so lowering this floor is all that is
++    // needed -- the icon-only collapse is upstream behaviour that this floor
++    // was preventing from ever being reached.
++    //
++    // 2 rather than 0 leaves a little breathing room around the icon.
++    // Revert: rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.taskmanager
++    if (!tasks.vertical && !tasks.iconsOnly) {
++        width += (PlasmaCore.Units.smallSpacing * 2) + (PlasmaCore.Theme.mSize(PlasmaCore.Theme.defaultFont).width * 2);
++    }
++
++    return width;
++}
++
++// --- LOCAL OVERRIDE (theme work) -----------------------------------------
++// The width a button gets when there IS room -- upstream's original 12-column
++// basis. preferredMaxWidth() used to derive from preferredMinWidth(), so
++// lowering the minimum to let buttons shrink to icons ALSO crushed the maximum,
++// leaving buttons narrow even on an empty panel and wrapping their labels onto
++// two lines. Keeping the cap on its own basis decouples the two: buttons still
++// collapse to icon squares when crowded, but expand to a comfortable width
++// when there is space.
++function comfortableWidth() {
++    var width = launcherWidth();
++
+     if (!tasks.vertical && !tasks.iconsOnly) {
+       width +=
+           (PlasmaCore.Units.smallSpacing * 2) +
+@@ -122,10 +155,10 @@
+     }
+
+     if (plasmoid.configuration.groupingStrategy != 0 && !plasmoid.configuration.groupPopups && !tasks.iconsOnly) {
+-        return preferredMinWidth();
++        return comfortableWidth();     // LOCAL OVERRIDE: was preferredMinWidth()
+     }
+
+-    return Math.floor(preferredMinWidth() * 1.6);
++    return Math.floor(comfortableWidth() * 1.6);   // LOCAL OVERRIDE: was preferredMinWidth()
+ }
+
+ function preferredMinHeight() {

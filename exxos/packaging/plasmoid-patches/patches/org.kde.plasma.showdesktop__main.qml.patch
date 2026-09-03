@@ -1,0 +1,26 @@
+--- a/contents/ui/main.qml
++++ b/contents/ui/main.qml
+@@ -44,10 +44,22 @@
+     Plasmoid.preferredRepresentation: Plasmoid.fullRepresentation
+     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
+
++    // --- LOCAL OVERRIDE (theme work, 2026-08-30) -------------------------
++    // This applet ("Minimize All Windows" / Show Desktop) never sets
++    // Layout.preferredWidth, so the panel containment falls back to
++    // root.height (see org.kde.panel main.qml:278), giving it a full
++    // panel-height slot (~50px on a 48px panel) around a 24px icon and
++    // leaving large gaps either side. Setting preferredWidth explicitly
++    // is what fixes it - its minimumWidth was already small.
++    // Revert: rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.showdesktop
++    readonly property int compactSlot: 38
++
+     Layout.minimumWidth: PlasmaCore.Units.iconSizes.small
+     Layout.minimumHeight: PlasmaCore.Units.iconSizes.small
+
+-    Layout.maximumWidth: inPanel ? PlasmaCore.Units.iconSizeHints.panel : -1
++    Layout.preferredWidth: Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? compactSlot : -1
++
++    Layout.maximumWidth: inPanel ? (Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? compactSlot : PlasmaCore.Units.iconSizeHints.panel) : -1
+     Layout.maximumHeight: inPanel ? PlasmaCore.Units.iconSizeHints.panel : -1
+
+     activeFocusOnTab: true

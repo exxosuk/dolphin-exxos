@@ -130,10 +130,27 @@ normalise_modes() {
 # package, a normal user cannot read them at all, so exxos-theme-apply died
 # half way through with "Permission denied". A package's files must be readable
 # by everybody; nothing here is a secret.
+# Shell scripts must stay executable, or exxos-theme-apply cannot call them.
 find "$1" -type d -exec chmod 755 {} +
 find "$1" -type f -exec chmod 644 {} +
+find "$1" -type f -name '*.sh' -exec chmod 755 {} +
 }
 normalise_modes "$STAGE/usr/share/exxos"
+
+# --- overlay the plasmoid patches with the repo's copies -------------------
+# The look-and-feel bundle may carry stale patches from the build machine's
+# home directory. The repo is the source of truth.
+REPO_PATCHES="$HERE/plasmoid-patches"
+if [ -d "$REPO_PATCHES/patches" ]; then
+    DEST="$STAGE/usr/share/exxos/plasma/look-and-feel/com.exxos.win7/bundle/plasmoid-patches"
+    mkdir -p "$DEST/patches"
+    cp "$REPO_PATCHES"/patches/*.patch "$DEST/patches/"
+    cp "$REPO_PATCHES/rebuild-overrides.sh" "$DEST/"
+    cp "$REPO_PATCHES/check-on-login.sh"    "$DEST/"
+    cp "$REPO_PATCHES/BASE-VERSION.txt"     "$DEST/"
+    chmod 755 "$DEST/rebuild-overrides.sh" "$DEST/check-on-login.sh"
+    echo "  + plasmoid patches overlaid from repo"
+fi
 
 install -D -m 755 "$TW/packaging/exxos-theme-apply" "$STAGE/usr/bin/exxos-theme-apply"
 
