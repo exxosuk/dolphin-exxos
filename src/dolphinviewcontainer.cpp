@@ -748,6 +748,13 @@ void DolphinViewContainer::slotDirectoryLoadingCompleted()
 
 void DolphinViewContainer::slotDirectoryLoadingCanceled()
 {
+    // A cancelled search is a finished search as far as the search bar is
+    // concerned. Without this the busy bar carries on animating after the
+    // stop button has been pressed, which says the opposite of what happened.
+    if (m_searchBox) {
+        m_searchBox->setSearchRunning(false);
+    }
+
     if (!m_statusBar->progressText().isEmpty()) {
         m_statusBar->setProgressText(QString());
         m_statusBar->setProgress(100);
