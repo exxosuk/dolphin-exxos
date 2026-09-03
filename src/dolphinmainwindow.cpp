@@ -290,6 +290,16 @@ DolphinMainWindow::DolphinMainWindow() :
                 i18nc("@info:progress", "Reading disc..."), 2000);
         }
     });
+    /* Exxos/Win7: mounting or unmounting an existing volume fires neither
+       deviceAdded nor deviceRemoved - the device was there all along, only its
+       accessibility changed. Without this the view kept whatever it was told
+       when it last listed: a drive stayed looking mounted after Unmount, so it
+       looked as though nothing had happened, and stayed looking unmounted
+       after Mount. */
+    exxosWatchAccessibility();
+    connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceAdded,
+            this, [this](const QString &) { exxosWatchAccessibility(); });
+
     connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceRemoved,
             this, [this](const QString &udi) {
         /* Resolve BEFORE the device is gone, while Solid can still say which
@@ -1763,6 +1773,36 @@ void DolphinMainWindow::exxosScanNetwork()
 
 /* Mount every removable volume that is not mounted yet. Called when the
    setting is switched on and whenever a device appears while it is on. */
+/* Exxos/Win7: follow every volume's accessibility, so the view is told when a
+   drive is mounted or unmounted by any route - our menu, another program, or
+   the desktop's own automounter. Connections are made once per device; Qt's
+   UniqueConnection keeps the repeat calls from stacking them up. */
+void DolphinMainWindow::exxosWatchAccessibility()
+{
+    const auto devices = Solid::Device::listFromType(Solid::DeviceInterface::StorageAccess, QString());
+    for (const Solid::Device &dev : devices) {
+        auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>());
+        if (!access) {
+            continue;
+        }
+        connect(access, &Solid::StorageAccess::accessibilityChanged,
+                this, &DolphinMainWindow::exxosAccessibilityChanged,
+                Qt::UniqueConnection);
+    }
+}
+
+void DolphinMainWindow::exxosAccessibilityChanged(bool accessible, const QString &udi)
+{
+    Q_UNUSED(accessible)
+    /* The drive has finished mounting or unmounting: stop its spinner and
+       re-list, so the tile, its capacity bar and the Mount/Unmount entry all
+       describe what is true now. */
+    ExxosBusySpinner::instance()->setDriveBusy(udi, false);
+    if (m_activeViewContainer && m_activeViewContainer->url().scheme() == QLatin1String("computer")) {
+        m_activeViewContainer->view()->reload();
+    }
+}
+
 void DolphinMainWindow::exxosMountRemovableVolumes()
 {
     const auto devices = Solid::Device::listFromType(Solid::DeviceInterface::StorageAccess, QString());

@@ -37,6 +37,7 @@
 
 #include <Solid/Device>
 #include <Solid/OpticalDrive>
+#include "exxosmediarescan.h"
 #include <Solid/StorageAccess>
 
 #include <QApplication>
@@ -258,6 +259,11 @@ bool DolphinContextMenu::addComputerDeviceActions()
     if (state == QLatin1String("unmounted")) {
         addAction(QIcon::fromTheme(QStringLiteral("media-mount")),
                   i18nc("@action:inmenu", "Mount"), [udi]() {
+            /* Spin the drive while it happens. Mounting a slow disk takes a
+               noticeable moment, and with no sign of anything happening the
+               obvious conclusion is that the click missed. The spinner is
+               stopped by accessibilityChanged when the drive is ready. */
+            ExxosBusySpinner::instance()->setDriveBusy(udi, true);
             Solid::Device dev(udi);
             if (auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>())) {
                 access->setup();
@@ -268,6 +274,7 @@ bool DolphinContextMenu::addComputerDeviceActions()
     } else if (state == QLatin1String("mounted")) {
         addAction(QIcon::fromTheme(QStringLiteral("media-eject")),
                   i18nc("@action:inmenu", "Unmount"), [udi]() {
+            ExxosBusySpinner::instance()->setDriveBusy(udi, true);
             Solid::Device dev(udi);
             if (auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>())) {
                 access->teardown();

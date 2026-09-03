@@ -618,6 +618,12 @@ private:
     /* Exxos/Win7: auto-mount removable media, and the toggle behind it. */
     void slotToggleAutoMount(bool enabled);
     void exxosMountRemovableVolumes();
+
+    /** Connect accessibilityChanged for every storage volume. */
+    void exxosWatchAccessibility();
+
+    /** A drive finished mounting or unmounting: stop its spinner and re-list. */
+    void exxosAccessibilityChanged(bool accessible, const QString &udi);
     /** Exxos: probe the network and refresh the Network entries. */
     void exxosScanNetwork();
 
