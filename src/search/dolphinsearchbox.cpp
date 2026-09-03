@@ -24,6 +24,7 @@
 #include <QButtonGroup>
 #include <QDir>
 #include <QFontDatabase>
+#include <KFilePlacesModel>
 #include <QMenu>
 #include <KSharedConfig>
 #include <KConfigGroup>
@@ -286,11 +287,37 @@ void DolphinSearchBox::rememberSearch(const QString& text)
 
 void DolphinSearchBox::showHistoryMenu()
 {
-    if (m_history.isEmpty()) {
+    QMenu menu(this);
+
+    // Saved searches first - they were deliberately kept, so they outrank
+    // whatever happens to have been typed lately. The floppy button beside
+    // the field puts them in Places, which is where they are read back from.
+    const QIcon savedIcon = QIcon::fromTheme(QStringLiteral("folder-saved-search-symbolic"));
+    KFilePlacesModel* places = DolphinPlacesModelSingleton::instance().placesModel();
+    int savedCount = 0;
+    for (int row = 0; row < places->rowCount(); ++row) {
+        const QModelIndex index = places->index(row, 0);
+        const QUrl url = places->url(index);
+        if (url.scheme() != QLatin1String("filenamesearch")
+            && url.scheme() != QLatin1String("baloosearch")) {
+            continue;
+        }
+        QAction* action = menu.addAction(savedIcon, places->text(index));
+        connect(action, &QAction::triggered, this, [this, url]() {
+            fromSearchUrl(url);
+            emitSearchRequest();
+        });
+        ++savedCount;
+    }
+
+    if (savedCount > 0 && !m_history.isEmpty()) {
+        menu.addSeparator();
+    }
+
+    if (savedCount == 0 && m_history.isEmpty()) {
         return;
     }
 
-    QMenu menu(this);
     for (const QString& entry : qAsConst(m_history)) {
         QAction* action = menu.addAction(entry);
         connect(action, &QAction::triggered, this, [this, entry]() {
