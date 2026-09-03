@@ -42,6 +42,7 @@
 #include <Solid/OpticalDisc>
 #include <Solid/OpticalDrive>
 
+#include <QSettings>
 #include <QSet>
 #include <QHash>
 #include <Solid/Block>
@@ -717,7 +718,7 @@ int categoryKey(const Drive &d)
 
 /* The user-visible line, e.g.
      "WIN7 (ntfs) — 520.8GB free of 931.6GB"
-     "DATA (ntfs) — not mounted"                                        */
+     "DGHJ (ntfs) — not mounted"                                        */
 QString describe(const Drive &d)
 {
     /* Two halves, separated by an em dash: what the HARDWARE is, and what is
@@ -726,7 +727,7 @@ QString describe(const Drive &d)
        usually the label, the half that says which disk this is.
 
            "Generic STORAGE DEVICE \u2014 [no label]"
-           "Samsung SSD 870 QVO 1TB \u2014 BACKUP (ntfs)"
+           "Samsung SSD 870 QVO 1TB \u2014 QVO BACKUP (ntfs)"
            "CD-RW/DVD\u00B1RW DL Drive \u2014 No disc"
            "External Floppy Drive \u2014 [no label], not mounted"
 
@@ -879,6 +880,16 @@ KIO::UDSEntry ComputerProtocol::driveEntry(const Drive &d, int categoryCount)
         e.fastInsert(KIO::UDSEntry::UDS_SIZE, static_cast<long long>(d.size));
     }
 
+    /* A drive that could be mounted and is not gets a marker on its icon, so
+       "not mounted" is visible at a glance rather than only in the text under
+       it. Explorer has nothing equivalent because Windows mounts everything;
+       here it is the difference between a drive you can open and one you
+       cannot. */
+    if (d.mountPath.isEmpty() && !d.noMedium && !d.network && d.size > 0) {
+        e.fastInsert(KIO::UDSEntry::UDS_ICON_OVERLAY_NAMES,
+                     QStringLiteral("emblem-unmounted"));
+    }
+
     return e;
 }
 
@@ -956,6 +967,21 @@ static QString joinPath(const QString &base, const QString &rest)
     return base + QLatin1Char('/') + rest;
 }
 
+/* Drives the user unmounted on purpose, as recorded by Dolphin. Read fresh
+   each time: the worker is long-lived and the list changes underneath it. */
+static bool userUnmounted(const QString &udi)
+{
+    /* Read with QSettings rather than KConfig: this worker links only KIO,
+       Solid, KI18n and Qt, and one list of strings is not worth another
+       dependency. Read fresh every time - the worker outlives the setting. */
+    const QString path =
+        QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
+        + QLatin1String("/dolphinrc");
+    QSettings cfg(path, QSettings::IniFormat);
+    const QString list = cfg.value(QStringLiteral("Exxos/UnmountedByUser")).toString();
+    return list.split(QLatin1Char(','), Qt::SkipEmptyParts).contains(udi);
+}
+
 void ComputerProtocol::listDir(const QUrl &url)
 {
     /* A path below the root names one drive.  computer:/ has no real
@@ -1001,6 +1027,19 @@ void ComputerProtocol::listDir(const QUrl &url)
             }
 
             QString path = d.mountPath, why;
+
+            /* A drive the user unmounted stays unmounted. Opening it used to
+               mount it again silently, which made Unmount look broken - the
+               drive said "not mounted" and opened anyway. Dolphin records the
+               deliberate unmounts in dolphinrc; Mount from the context menu
+               clears the entry. */
+            if (path.isEmpty() && userUnmounted(d.udi)) {
+                error(KIO::ERR_ACCESS_DENIED,
+                      i18n("%1 is not mounted. Right-click it and choose Mount to open it.",
+                           d.label.isEmpty() ? d.description : d.label));
+                return;
+            }
+
             if (path.isEmpty() && !mountDrive(d.udi, &path, &why)) {
                 error(KIO::ERR_CANNOT_MOUNT,
                       i18n("%1 could not be mounted. %2", d.label, why));

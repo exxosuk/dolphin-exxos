@@ -19,6 +19,8 @@
 #include "views/viewmodecontroller.h"
 
 #include <KActionCollection>
+#include <KSharedConfig>
+#include <KConfigGroup>
 #include <KFileItemListProperties>
 #include <KHamburgerMenu>
 #include <KIO/EmptyTrashJob>
@@ -103,6 +105,27 @@ void DolphinContextMenu::addAllActions()
     } else {
         addViewportContextMenu();
     }
+}
+
+/* Exxos/Win7: drives the user has deliberately unmounted.
+
+   Kept in dolphinrc so it survives a restart, and read by the computer:/
+   worker too - which is what stops a click on an unmounted drive quietly
+   mounting it again. Solid UDIs are stable, so they are what is stored. */
+void exxosSetUnmountedByUser(const QString &udi, bool unmounted)
+{
+    KConfigGroup group(KSharedConfig::openConfig(), "Exxos");
+    QStringList list = group.readEntry("UnmountedByUser", QStringList());
+    const bool had = list.contains(udi);
+    if (unmounted && !had) {
+        list.append(udi);
+    } else if (!unmounted && had) {
+        list.removeAll(udi);
+    } else {
+        return;
+    }
+    group.writeEntry("UnmountedByUser", list);
+    group.sync();
 }
 
 bool DolphinContextMenu::eventFilter(QObject* object, QEvent* event)
@@ -239,6 +262,7 @@ bool DolphinContextMenu::addComputerDeviceActions()
             if (auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>())) {
                 access->setup();
             }
+            exxosSetUnmountedByUser(udi, false);
         });
         added = true;
     } else if (state == QLatin1String("mounted")) {
@@ -248,6 +272,11 @@ bool DolphinContextMenu::addComputerDeviceActions()
             if (auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>())) {
                 access->teardown();
             }
+            /* Remember it. Unmounting has to mean something: without this the
+               drive is mounted again by the next click on it, or by the
+               auto-mount sweep six seconds later, and the user is left
+               wondering what unmount was for. */
+            exxosSetUnmountedByUser(udi, true);
         });
         added = true;
     }

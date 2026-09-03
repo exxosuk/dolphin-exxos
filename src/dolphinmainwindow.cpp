@@ -1776,7 +1776,17 @@ void DolphinMainWindow::exxosMountRemovableVolumes()
 
     for (const Solid::Device &dev : devices) {
         auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>());
-        if (!access || access->isAccessible()) {
+        if (!access) {
+            continue;
+        }
+        /* Anything already mounted counts as done, even though we did not
+           mount it. Without this, unmounting a drive that was mounted before
+           Dolphin started leaves a volume we have never "attempted", and the
+           sweep helpfully mounts it straight back - six seconds after the user
+           deliberately ejected it. Unmounting should stick until it is mounted
+           again on purpose, or the medium is taken out and put back. */
+        if (access->isAccessible()) {
+            m_exxosMountAttempted.insert(dev.udi());
             continue;
         }
         const auto *volume = dev.as<Solid::StorageVolume>();
