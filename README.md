@@ -4,7 +4,8 @@
 > KF5 5.103, Qt 5.15.8, amd64). No other release is tested or supported, and
 > the Dolphin in this package is compiled against that exact ABI — on anything
 > else it will not start. Treat it as something to try, not something to rely
-> on.
+> on. It is also not a pixel-accurate Windows 7 clone — see
+> [The theme](#the-theme).
 
 ![Computer view](docs/screenshot-computer.png)
 
@@ -51,8 +52,18 @@ A patched Dolphin 22.12.3 with the Explorer drive view Plasma does not have.
 
 Window decorations, Plasma theme, colour scheme, Start menu styling and a
 classic Windows-style icon set.
+
 Installed by the package; applied per user with `exxos-theme-apply`, because a
 theme lives in your own configuration and a package installs for everybody.
+
+**It is not a faithful reproduction of Windows 7.** What it reproduces is *my*
+Windows 7 — the taskbar, the Start menu and the colours as I had them set up on
+that machine, not the stock arrangement Microsoft shipped. Anyone expecting a
+pixel-for-pixel copy will not find one here. What is close is the way it
+behaves: things sit where the muscle memory expects them and respond the way
+they used to, which is the part that actually makes a move off Windows bearable.
+The rest is ordinary Plasma configuration, so if you want it nearer the original
+you can move it there yourself.
 
 The icon theme is in **`exxos-icons`**, which apt installs alongside the
 desktop package by default, so it looks right from the first login rather than
