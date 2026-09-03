@@ -304,6 +304,7 @@ KStandardItemListWidget::KStandardItemListWidget(KItemListWidgetInformant* infor
     m_customTextColor(),
     m_additionalInfoTextColor(),
     m_overlay(),
+    m_exxosUnavailable(false),
     m_rating(),
     m_roleEditor(nullptr),
     m_oldRoleEditor(nullptr)
@@ -487,7 +488,38 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
             drawPixmap(painter, m_hoverPixmap);
         }
     } else if (!m_pixmap.isNull()) {
-        drawPixmap(painter, m_pixmap);
+        if (m_exxosUnavailable) {
+            /* Exxos/Win7: an unmounted drive is drawn as unavailable - the
+               icon greyed and faded, with a padlock over it. The text says
+               "not mounted" as well, but that is the first thing elided on a
+               narrow tile, and a drive you cannot open should not look
+               identical to one you can. */
+            QImage grey = m_pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
+            for (int y = 0; y < grey.height(); ++y) {
+                auto *line = reinterpret_cast<QRgb *>(grey.scanLine(y));
+                for (int x = 0; x < grey.width(); ++x) {
+                    const int g = qGray(line[x]);
+                    line[x] = qRgba(g, g, g, qAlpha(line[x]));
+                }
+            }
+            QPixmap faded = QPixmap::fromImage(grey);
+            faded.setDevicePixelRatio(m_pixmap.devicePixelRatio());
+            const qreal was = painter->opacity();
+            painter->setOpacity(was * 0.55);
+            drawPixmap(painter, faded);
+            painter->setOpacity(was);
+
+            const QPixmap lock = QIcon::fromTheme(QStringLiteral("object-locked"))
+                                     .pixmap(qRound(m_scaledPixmapSize.width() * 0.45));
+            if (!lock.isNull()) {
+                painter->drawPixmap(QPointF(m_pixmapPos.x(),
+                                            m_pixmapPos.y() + m_scaledPixmapSize.height()
+                                                - lock.height() / lock.devicePixelRatio()),
+                                    lock);
+            }
+        } else {
+            drawPixmap(painter, m_pixmap);
+        }
     }
 
     /* Exxos/Win7 tile: the drive name is bold, as in Explorer. */
@@ -1168,6 +1200,7 @@ void KStandardItemListWidget::updatePixmapCache()
                 // use a generic icon as fallback
                 iconName = QStringLiteral("unknown");
             }
+            m_exxosUnavailable = values.value("deviceState").toString() == QLatin1String("unmounted");
             const QStringList overlays = values["iconOverlays"].toStringList();
             m_pixmap = pixmapForIcon(iconName, overlays, maxIconHeight, m_layout != IconsLayout && isActiveWindow() && isSelected() ? QIcon::Selected : QIcon::Normal);
 

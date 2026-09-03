@@ -1859,6 +1859,13 @@ QHash<QByteArray, QVariant> KFileItemModel::retrieveData(const KFileItem& item, 
         if (!udi.isEmpty()) {
             data.insert(sharedValue("deviceUdi"), udi);
         }
+        /* And whether the drive is mounted, so a tile can show an unmounted
+           drive as unavailable rather than relying on a line of text that is
+           the first thing to be elided when the tile is narrow. */
+        const QString state = e.stringValue(KIO::UDSEntry::UDS_EXTRA + 3);
+        if (!state.isEmpty()) {
+            data.insert(sharedValue("deviceState"), state);
+        }
     }
 
     const bool isDir = item.isDir();

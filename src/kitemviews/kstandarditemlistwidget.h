@@ -331,6 +331,7 @@ private:
     QColor m_additionalInfoTextColor;
 
     QPixmap m_overlay;
+    bool m_exxosUnavailable;   // drive present but not mounted
     QPixmap m_rating;
 
     KItemListRoleEditor* m_roleEditor;
