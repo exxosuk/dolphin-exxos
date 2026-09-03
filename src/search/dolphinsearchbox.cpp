@@ -55,6 +55,7 @@ DolphinSearchBox::DolphinSearchBox(QWidget* parent) :
     m_recentButton(nullptr),
     m_savedButton(nullptr),
     m_history(),
+    m_focusViewOnLoad(false),
     m_optionsScrollArea(nullptr),
     m_fileNameButton(nullptr),
     m_contentButton(nullptr),
@@ -401,8 +402,16 @@ void DolphinSearchBox::slotSearchTextChanged(const QString& text)
 
 void DolphinSearchBox::slotReturnPressed()
 {
+    m_focusViewOnLoad = true;
     emitSearchRequest();
     Q_EMIT focusViewRequest();
+}
+
+bool DolphinSearchBox::takeFocusViewOnLoad()
+{
+    const bool wanted = m_focusViewOnLoad;
+    m_focusViewOnLoad = false;
+    return wanted;
 }
 
 void DolphinSearchBox::slotFacetChanged()

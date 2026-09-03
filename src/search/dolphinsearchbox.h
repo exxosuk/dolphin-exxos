@@ -139,6 +139,17 @@ private Q_SLOTS:
     /** Shows the searches kept with the save button. */
     void showSavedMenu();
 
+public:
+    /**
+     * True once, if Enter was pressed and the results have not been given
+     * focus yet. Focus is requested on Enter already, but the results load
+     * afterwards and the focus is lost with them, which leaves Ctrl+C and
+     * every other view shortcut going to the search field instead.
+     */
+    bool takeFocusViewOnLoad();
+
+private:
+
     /** Records a search in the history, newest first, capped and de-duplicated. */
     void rememberSearch(const QString& text);
     void emitCloseRequest();
@@ -184,6 +195,7 @@ private:
     QToolButton* m_recentButton;
     QToolButton* m_savedButton;
     QStringList m_history;
+    bool m_focusViewOnLoad;
     QScrollArea* m_optionsScrollArea;
     QToolButton* m_fileNameButton;
     QToolButton* m_contentButton;

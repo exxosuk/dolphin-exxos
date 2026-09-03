@@ -724,6 +724,12 @@ void DolphinViewContainer::slotDirectoryLoadingCompleted()
 {
     if (m_searchBox) {
         m_searchBox->setSearchRunning(false && isSearchModeEnabled());
+        // Hand the results the keyboard once they have arrived. Enter asks for
+        // this already, but the loading that follows takes the focus back, so
+        // Ctrl+C and friends end up in the search field with nothing to copy.
+        if (isSearchModeEnabled() && m_searchBox->takeFocusViewOnLoad()) {
+            requestFocus();
+        }
     }
     /* Exxos/Win7: the drives have now actually been read, so stop the
        spinners. Tying it to the listing rather than to a timer is the whole
