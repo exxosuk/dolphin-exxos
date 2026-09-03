@@ -139,6 +139,8 @@ account, with the measurements, is in `THEME-LOG.md`; the short version:
 
 ## Version numbers
 
+Every release is listed in [CHANGELOG.md](CHANGELOG.md).
+
 `MAJOR.MINOR.PATCH`, from `VERSION`, generated into the build so the title bar,
 the package and the git tag cannot disagree.
 
