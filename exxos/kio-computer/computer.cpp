@@ -42,7 +42,8 @@
 #include <Solid/OpticalDisc>
 #include <Solid/OpticalDrive>
 
-#include <QSettings>
+#include <QFile>
+#include <QTextStream>
 #include <QSet>
 #include <QHash>
 #include <Solid/Block>
@@ -971,15 +972,35 @@ static QString joinPath(const QString &base, const QString &rest)
    each time: the worker is long-lived and the list changes underneath it. */
 static bool userUnmounted(const QString &udi)
 {
-    /* Read with QSettings rather than KConfig: this worker links only KIO,
-       Solid, KI18n and Qt, and one list of strings is not worth another
-       dependency. Read fresh every time - the worker outlives the setting. */
+    /* Parsed by hand rather than with QSettings or KConfig. KConfig would be
+       another dependency for one list of strings; QSettings looks like the
+       cheap answer and is not - dolphinrc opens with KDE's window geometry
+       keys before any [section] header, which QSettings treats as a malformed
+       file and gives up on, so every lookup came back empty and a drive the
+       user had unmounted opened anyway. Read fresh each time: the worker
+       outlives the setting. */
     const QString path =
         QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
         + QLatin1String("/dolphinrc");
-    QSettings cfg(path, QSettings::IniFormat);
-    const QString list = cfg.value(QStringLiteral("Exxos/UnmountedByUser")).toString();
-    return list.split(QLatin1Char(','), Qt::SkipEmptyParts).contains(udi);
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return false;
+    }
+    QTextStream in(&file);
+    bool inGroup = false;
+    while (!in.atEnd()) {
+        const QString line = in.readLine().trimmed();
+        if (line.startsWith(QLatin1Char('['))) {
+            inGroup = (line == QLatin1String("[Exxos]"));
+            continue;
+        }
+        if (!inGroup || !line.startsWith(QLatin1String("UnmountedByUser="))) {
+            continue;
+        }
+        const QString value = line.section(QLatin1Char('='), 1);
+        return value.split(QLatin1Char(','), Qt::SkipEmptyParts).contains(udi);
+    }
+    return false;
 }
 
 void ComputerProtocol::listDir(const QUrl &url)
