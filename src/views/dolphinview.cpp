@@ -55,6 +55,7 @@
 
 #include <QAbstractItemView>
 #include <QActionGroup>
+#include <QUrlQuery>
 #include <QApplication>
 #include <QClipboard>
 #include <QDropEvent>
@@ -664,6 +665,16 @@ void DolphinView::setNameFilter(const QString& nameFilter)
     m_model->setNameFilter(nameFilter);
 }
 
+void DolphinView::setSearchPattern(const QString& searchPattern)
+{
+    m_model->setSearchPattern(searchPattern);
+}
+
+QString DolphinView::searchPattern() const
+{
+    return m_model->searchPattern();
+}
+
 QString DolphinView::nameFilter() const
 {
     return m_model->nameFilter();
@@ -780,6 +791,19 @@ void DolphinView::setUrl(const QUrl& url)
     clearSelection();
 
     m_url = url;
+
+    // The filename search worker only does substring matching, so a search for
+    // *.mid is sent to it with the wildcards stripped and the real pattern
+    // carried alongside. Apply that pattern here, and drop it again as soon as
+    // we navigate anywhere that is not a search.
+    m_model->setLoadingFrozen(false);
+
+    if (url.scheme() == QLatin1String("filenamesearch")) {
+        const QUrlQuery searchQuery(url);
+        setSearchPattern(searchQuery.queryItemValue(QStringLiteral("exxosPattern")));
+    } else if (!searchPattern().isEmpty()) {
+        setSearchPattern(QString());
+    }
 
     hideToolTip();
 

@@ -42,6 +42,15 @@ public:
      * Set the list of mimetypes that are used for comparison with the
      * item in KFileItemModelFilter::matchesMimeType.
      */
+    /**
+     * Sets the wildcard pattern that came from the search box, kept separate
+     * from setPattern() so that searching does not disturb the filter bar and
+     * vice versa. Matched with wildcard semantics: *.mid means files whose
+     * name ends in .mid, not files with "mid" somewhere in them.
+     */
+    void setSearchPattern(const QString& pattern);
+    QString searchPattern() const;
+
     void setMimeTypes(const QStringList& types);
     QStringList mimeTypes() const;
 
@@ -67,6 +76,11 @@ private:
      */
     bool matchesType(const KFileItem& item) const;
 
+    /**
+     * @return True if item matches the wildcard set by @ref setSearchPattern.
+     */
+    bool matchesSearchPattern(const KFileItem& item) const;
+
     bool m_useRegExp;           // If true, m_regExp is used for filtering,
                                 // otherwise m_lowerCaseFilter is used.
     QRegularExpression *m_regExp;
@@ -74,6 +88,8 @@ private:
                                 // faster comparison in matches().
     QString m_pattern;          // Property set by setPattern().
     QStringList m_mimeTypes;    // Property set by setMimeTypes()
+    QRegularExpression *m_searchRegExp; // Wildcard from the search box
+    QString m_searchPattern;    // Property set by setSearchPattern()
 };
 #endif
 

@@ -75,6 +75,14 @@ public:
      */
     void cancelDirectoryLoading();
 
+    /**
+     * While frozen, results arriving from the directory lister are dropped.
+     * Used to make a search actually stop: the filenamesearch worker ignores
+     * job cancellation and keeps sending results regardless.
+     */
+    void setLoadingFrozen(bool frozen);
+    bool isLoadingFrozen() const;
+
     int count() const override;
     QHash<QByteArray, QVariant> data(int index) const override;
     bool setData(int index, const QHash<QByteArray, QVariant>& values) override;
@@ -177,6 +185,13 @@ public:
 
     void setNameFilter(const QString& nameFilter);
     QString nameFilter() const;
+
+    /**
+     * Wildcard from the search box, applied on top of the filter bar rather
+     * than replacing it. See KFileItemModelFilter::setSearchPattern().
+     */
+    void setSearchPattern(const QString& searchPattern);
+    QString searchPattern() const;
 
     void setMimeTypeFilters(const QStringList& filters);
     QStringList mimeTypeFilters() const;
@@ -499,6 +514,7 @@ private:
     mutable QHash<QUrl, int> m_items;
 
     KFileItemModelFilter m_filter;
+    bool m_loadingFrozen;
     QHash<KFileItem, ItemData*> m_filteredItems; // Items that got hidden by KFileItemModel::setNameFilter()
 
     bool m_requestRole[RolesCount];

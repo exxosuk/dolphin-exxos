@@ -93,11 +93,21 @@ protected:
     void keyReleaseEvent(QKeyEvent* event) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
 
+public Q_SLOTS:
+    /** Shows or hides the stop button as a search starts and finishes. */
+    void setSearchRunning(bool running);
+
 Q_SIGNALS:
     /**
      * Is emitted when a searching should be triggered.
      */
     void searchRequest();
+
+    /**
+     * Is emitted when the user asks for a running search to stop. The results
+     * found so far stay on screen; only the search itself is cancelled.
+     */
+    void stopSearchRequest();
 
     /**
      * Is emitted when the user has changed a character of
@@ -156,6 +166,7 @@ private:
     QVBoxLayout* m_topLayout;
 
     QLineEdit* m_searchInput;
+    QToolButton* m_stopButton;
     QAction* m_saveSearchAction;
     QScrollArea* m_optionsScrollArea;
     QToolButton* m_fileNameButton;

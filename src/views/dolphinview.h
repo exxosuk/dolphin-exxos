@@ -252,6 +252,12 @@ public:
     QString nameFilter() const;
 
     /**
+     * Wildcard from the search box, applied on top of the filter bar.
+     */
+    void setSearchPattern(const QString& searchPattern);
+    QString searchPattern() const;
+
+    /**
      * Filters the currently shown items by \a filters. All items
      * whose content-type matches those given by the list of filters
      * will be shown.

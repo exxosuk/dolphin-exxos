@@ -32,6 +32,7 @@
 #include <QShowEvent>
 #include <QTimer>
 #include <QToolButton>
+#include <QRegularExpression>
 #include <QUrlQuery>
 
 DolphinSearchBox::DolphinSearchBox(QWidget* parent) :
@@ -40,6 +41,7 @@ DolphinSearchBox::DolphinSearchBox(QWidget* parent) :
     m_active(true),
     m_topLayout(nullptr),
     m_searchInput(nullptr),
+    m_stopButton(nullptr),
     m_saveSearchAction(nullptr),
     m_optionsScrollArea(nullptr),
     m_fileNameButton(nullptr),
@@ -116,7 +118,28 @@ QUrl DolphinSearchBox::urlForSearching() const
         url.setScheme(QStringLiteral("filenamesearch"));
 
         QUrlQuery query;
-        query.addQueryItem(QStringLiteral("search"), m_searchInput->text());
+
+        // The filenamesearch worker matches a plain substring, so a pattern
+        // like *.mid finds nothing at all - no file has an asterisk in its
+        // name. Send it the longest literal run instead, which returns a
+        // superset, and carry the pattern itself so the view can apply proper
+        // wildcard matching to what comes back.
+        const QString text = m_searchInput->text();
+        QString workerText = text;
+        if (text.contains(QLatin1Char('*')) || text.contains(QLatin1Char('?'))
+            || text.contains(QLatin1Char('['))) {
+            workerText.clear();
+            const QStringList literals =
+                text.split(QRegularExpression(QStringLiteral("[*?\\[\\]]")), Qt::SkipEmptyParts);
+            for (const QString& literal : literals) {
+                if (literal.length() > workerText.length()) {
+                    workerText = literal;
+                }
+            }
+            query.addQueryItem(QStringLiteral("exxosPattern"), text);
+        }
+
+        query.addQueryItem(QStringLiteral("search"), workerText);
         if (m_contentButton->isChecked()) {
             query.addQueryItem(QStringLiteral("checkContent"), QStringLiteral("yes"));
         }
@@ -137,7 +160,11 @@ void DolphinSearchBox::fromSearchUrl(const QUrl& url)
         updateFromQuery(query);
     } else if (url.scheme() == QLatin1String("filenamesearch")) {
         const QUrlQuery query(url);
-        setText(query.queryItemValue(QStringLiteral("search")));
+        // Show what was actually typed. The "search" item holds the wildcard-free
+        // text sent to the worker, so using it here would quietly rewrite *.mid
+        // as .mid the moment the URL is read back.
+        const QString pattern = query.queryItemValue(QStringLiteral("exxosPattern"));
+        setText(pattern.isEmpty() ? query.queryItemValue(QStringLiteral("search")) : pattern);
         if (m_searchPath.scheme() != url.scheme()) {
             m_searchPath = QUrl();
         }
@@ -241,6 +268,13 @@ void DolphinSearchBox::emitSearchRequest()
     m_startedSearching = true;
     m_saveSearchAction->setEnabled(true);
     Q_EMIT searchRequest();
+}
+
+void DolphinSearchBox::setSearchRunning(bool running)
+{
+    if (m_stopButton) {
+        m_stopButton->setVisible(running);
+    }
 }
 
 void DolphinSearchBox::emitCloseRequest()
@@ -354,10 +388,23 @@ void DolphinSearchBox::init()
     closeButton->setToolTip(i18nc("@info:tooltip", "Quit searching"));
     connect(closeButton, &QToolButton::clicked, this, &DolphinSearchBox::emitCloseRequest);
 
+    // Stopping a search is not the same as leaving it: the results found so
+    // far stay where they are. Without a button for it the only way to stop
+    // was Escape, which closes the search and throws the results away.
+    m_stopButton = new QToolButton(this);
+    m_stopButton->setIcon(QIcon::fromTheme(QStringLiteral("process-stop")));
+    m_stopButton->setAutoRaise(true);
+    m_stopButton->setToolTip(i18nc("@info:tooltip", "Stop searching, keeping the results found so far"));
+    m_stopButton->hide();
+    connect(m_stopButton, &QToolButton::clicked, this, [this]() {
+        Q_EMIT stopSearchRequest();
+    });
+
     // Apply layout for the search input
     QHBoxLayout* searchInputLayout = new QHBoxLayout();
     searchInputLayout->setContentsMargins(0, 0, 0, 0);
     searchInputLayout->addWidget(m_searchInput);
+    searchInputLayout->addWidget(m_stopButton);
     searchInputLayout->addWidget(closeButton);
 
     // Create "Filename" and "Content" button

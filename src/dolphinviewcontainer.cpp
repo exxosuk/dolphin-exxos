@@ -149,6 +149,12 @@ DolphinViewContainer::DolphinViewContainer(const QUrl& url, QWidget* parent) :
             this, &DolphinViewContainer::slotItemsActivated);
     connect(m_view, &DolphinView::redirection,
             this, &DolphinViewContainer::redirect);
+    // Stop the search without leaving it: stopLoading() cancels the job and
+    // freezes what the view already has. This has to be connected here rather
+    // than beside the other search box connections, because m_view does not
+    // exist yet at that point.
+    connect(m_searchBox, &DolphinSearchBox::stopSearchRequest, m_view, &DolphinView::stopLoading);
+
     connect(m_view, &DolphinView::directoryLoadingStarted,
             this, &DolphinViewContainer::slotDirectoryLoadingStarted);
     connect(m_view, &DolphinView::directoryLoadingCompleted,
@@ -682,6 +688,9 @@ void DolphinViewContainer::updateDirectorySortingProgress(int percent)
 
 void DolphinViewContainer::slotDirectoryLoadingStarted()
 {
+    if (m_searchBox) {
+        m_searchBox->setSearchRunning(true && isSearchModeEnabled());
+    }
     /* Exxos/Win7: say what is happening while the drives are being read.
 
        computer:/ asks every drive what is in it, and a floppy or a card slot
@@ -713,6 +722,9 @@ void DolphinViewContainer::slotDirectoryLoadingStarted()
 
 void DolphinViewContainer::slotDirectoryLoadingCompleted()
 {
+    if (m_searchBox) {
+        m_searchBox->setSearchRunning(false && isSearchModeEnabled());
+    }
     /* Exxos/Win7: the drives have now actually been read, so stop the
        spinners. Tying it to the listing rather than to a timer is the whole
        point -- a floppy can take several seconds longer than any guess. */

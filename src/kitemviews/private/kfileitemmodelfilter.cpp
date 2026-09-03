@@ -14,7 +14,9 @@ KFileItemModelFilter::KFileItemModelFilter() :
     m_useRegExp(false),
     m_regExp(nullptr),
     m_lowerCasePattern(),
-    m_pattern()
+    m_pattern(),
+    m_searchRegExp(nullptr),
+    m_searchPattern()
 {
 }
 
@@ -22,6 +24,8 @@ KFileItemModelFilter::~KFileItemModelFilter()
 {
     delete m_regExp;
     m_regExp = nullptr;
+    delete m_searchRegExp;
+    m_searchRegExp = nullptr;
 }
 
 void KFileItemModelFilter::setPattern(const QString& filter)
@@ -58,12 +62,18 @@ QStringList KFileItemModelFilter::mimeTypes() const
 
 bool KFileItemModelFilter::hasSetFilters() const
 {
-    return (!m_pattern.isEmpty() || !m_mimeTypes.isEmpty());
+    return !m_searchPattern.isEmpty() || (!m_pattern.isEmpty() || !m_mimeTypes.isEmpty());
 }
 
 
 bool KFileItemModelFilter::matches(const KFileItem& item) const
 {
+    // The search pattern is not one of the user's filters - it is what was
+    // typed in the search box - so it applies on top of whatever else is set.
+    if (!m_searchPattern.isEmpty() && !matchesSearchPattern(item)) {
+        return false;
+    }
+
     const bool hasPatternFilter = !m_pattern.isEmpty();
     const bool hasMimeTypesFilter = !m_mimeTypes.isEmpty();
 
@@ -92,6 +102,48 @@ bool KFileItemModelFilter::matchesPattern(const KFileItem& item) const
     } else {
         return item.text().toLower().contains(m_lowerCasePattern);
     }
+}
+
+void KFileItemModelFilter::setSearchPattern(const QString& pattern)
+{
+    m_searchPattern = pattern;
+
+    if (pattern.isEmpty()) {
+        return;
+    }
+
+    if (!m_searchRegExp) {
+        m_searchRegExp = new QRegularExpression();
+        m_searchRegExp->setPatternOptions(QRegularExpression::CaseInsensitiveOption);
+    }
+
+    // A search without any wildcard in it keeps the substring behaviour people
+    // expect from a search box: typing "mid" finds anything with mid in it.
+    // Once a wildcard appears, the whole name has to match, so *.mid means
+    // what it means everywhere else.
+    if (pattern.contains(QLatin1Char('*')) || pattern.contains(QLatin1Char('?'))
+        || pattern.contains(QLatin1Char('['))) {
+        m_searchRegExp->setPattern(QRegularExpression::wildcardToRegularExpression(pattern));
+    } else {
+        m_searchRegExp->setPattern(QRegularExpression::escape(pattern));
+    }
+
+    if (!m_searchRegExp->isValid()) {
+        m_searchPattern.clear();
+    }
+}
+
+QString KFileItemModelFilter::searchPattern() const
+{
+    return m_searchPattern;
+}
+
+bool KFileItemModelFilter::matchesSearchPattern(const KFileItem& item) const
+{
+    if (!m_searchRegExp || m_searchPattern.isEmpty()) {
+        return true;
+    }
+    return m_searchRegExp->match(item.text()).hasMatch();
 }
 
 bool KFileItemModelFilter::matchesType(const KFileItem& item) const
