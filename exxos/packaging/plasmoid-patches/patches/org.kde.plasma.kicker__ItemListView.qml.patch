@@ -1,16 +1,19 @@
---- a/contents/ui/ItemListView.qml
-+++ b/contents/ui/ItemListView.qml
-@@ -13,6 +13,24 @@
+--- /usr/share/plasma/plasmoids/org.kde.plasma.kicker/contents/ui/ItemListView.qml	2023-05-09 12:37:55.000000000 +0100
++++ /home/exxos/claude/audit/theme-audit/plasmoids/plasmoids/org.kde.plasma.kicker/contents/ui/ItemListView.qml	2026-09-01 20:21:45.000000000 +0100
+@@ -13,6 +13,27 @@
  FocusScope {
      id: itemList
-
-+    // --- LOCAL OVERRIDE (theme work 2026-08-30) ---------------------------
+ 
++    // --- LOCAL OVERRIDE (theme work, reapplied for Plasma 5.27) -----------
 +    // Submenus are separate Kicker.SubMenu dialogs whose mainItem is this
 +    // ItemListView, so they were still drawn on the Plasma theme's translucent
-+    // glass while ItemListDelegate had already been switched to dark text -
++    // glass while ItemListDelegate had already been switched to dark text --
 +    // dark-on-glass, i.e. unreadable. Painting the backdrop here covers the
 +    // root list AND every submenu with the same flat colour, so they match.
 +    // Colour sampled from menu7.PNG: (244,244,247).
++    //
++    // 5.27 renamed the global `units` context object to PlasmaCore.Units,
++    // which is why the 5.20 version of this patch no longer applied.
 +    // Revert: rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.kicker
 +    Rectangle {
 +        id: win7ListBackdrop
@@ -24,3 +27,4 @@
 +
      property real minimumWidth: PlasmaCore.Units.gridUnit * 14
      property real maximumWidth: minimumWidth * 2
+ 

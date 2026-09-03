@@ -1,9 +1,9 @@
---- a/contents/ui/code/layout.js
-+++ b/contents/ui/code/layout.js
+--- /usr/share/plasma/plasmoids/org.kde.plasma.taskmanager/contents/ui/code/layout.js	2023-05-09 12:37:56.000000000 +0100
++++ /home/exxos/claude/audit/theme-audit/plasmoids/plasmoids/org.kde.plasma.taskmanager/contents/ui/code/layout.js	2026-09-01 16:45:15.000000000 +0100
 @@ -103,6 +103,39 @@
  function preferredMinWidth() {
      var width = launcherWidth();
-
+ 
 +    // --- LOCAL OVERRIDE (theme work) -------------------------------------
 +    // Upstream reserves 12 characters of text width per task button as a hard
 +    // floor. With "Maximum rows" set to 1 that floor is reached quickly, and
@@ -20,7 +20,7 @@
 +    // 2 rather than 0 leaves a little breathing room around the icon.
 +    // Revert: rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.taskmanager
 +    if (!tasks.vertical && !tasks.iconsOnly) {
-+        width += (PlasmaCore.Units.smallSpacing * 2) + (PlasmaCore.Theme.mSize(PlasmaCore.Theme.defaultFont).width * 2);
++        width += (units.smallSpacing * 2) + (theme.mSize(theme.defaultFont).width * 2);
 +    }
 +
 +    return width;
@@ -40,16 +40,3 @@
      if (!tasks.vertical && !tasks.iconsOnly) {
        width +=
            (PlasmaCore.Units.smallSpacing * 2) +
-@@ -122,10 +155,10 @@
-     }
-
-     if (plasmoid.configuration.groupingStrategy != 0 && !plasmoid.configuration.groupPopups && !tasks.iconsOnly) {
--        return preferredMinWidth();
-+        return comfortableWidth();     // LOCAL OVERRIDE: was preferredMinWidth()
-     }
-
--    return Math.floor(preferredMinWidth() * 1.6);
-+    return Math.floor(comfortableWidth() * 1.6);   // LOCAL OVERRIDE: was preferredMinWidth()
- }
-
- function preferredMinHeight() {

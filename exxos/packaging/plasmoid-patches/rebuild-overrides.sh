@@ -23,7 +23,6 @@ CHECK=0; [ "${1:-}" = "--check" ] && CHECK=1
 
 declare -A FILES=(
   [org.kde.plasma.icon]="contents/ui/main.qml"
-  [org.kde.plasma.showdesktop]="contents/ui/main.qml"
   [org.kde.plasma.kicker]="contents/ui/MenuRepresentation.qml contents/ui/ItemListView.qml contents/ui/ItemListDelegate.qml"
   [org.kde.plasma.taskmanager]="contents/ui/code/layout.js"
 )

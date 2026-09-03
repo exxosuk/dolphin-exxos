@@ -1,6 +1,6 @@
---- a/contents/ui/MenuRepresentation.qml
-+++ b/contents/ui/MenuRepresentation.qml
-@@ -49,6 +49,24 @@
+--- /usr/share/plasma/plasmoids/org.kde.plasma.kicker/contents/ui/MenuRepresentation.qml	2023-05-09 12:37:55.000000000 +0100
++++ /home/exxos/claude/audit/theme-audit/plasmoids/plasmoids/org.kde.plasma.kicker/contents/ui/MenuRepresentation.qml	2026-09-01 21:44:18.000000000 +0100
+@@ -42,6 +42,24 @@
          searchField.focus = true;
      }
  
@@ -25,3 +25,27 @@
      Row {
          id: mainRow
  
+@@ -298,6 +316,23 @@
+     PlasmaExtras.SearchField {
+         id: searchField
+ 
++        // --- EXXOS LOCAL OVERRIDE ------------------------------------------
++        // The field inherited the Plasma theme's dark colours, so on the light
++        // menu backdrop it was dark-grey text on a mid-grey field with an
++        // almost invisible placeholder.
++        //
++        // A child Rectangle at z:-1 does NOT work: SearchField draws its own
++        // background item, which sits above anything added as a child. The
++        // background PROPERTY has to be replaced instead.
++        background: Rectangle {
++            color: "#fbfbfb"
++            border.color: "#9a9a9a"
++            border.width: 1
++            radius: 2
++        }
++        color: "#1a1a1a"
++        placeholderTextColor: "#1a1a1a"
++
+         anchors.bottom: mainRow.bottom
+         anchors.left: parent.left
+         anchors.leftMargin: sideBar.width + (sideBar.width ? mainRow.spacing : PlasmaCore.Units.smallSpacing)

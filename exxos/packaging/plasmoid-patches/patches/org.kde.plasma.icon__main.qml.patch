@@ -1,34 +1,39 @@
---- a/contents/ui/main.qml
-+++ b/contents/ui/main.qml
-@@ -43,10 +43,29 @@
+--- /usr/share/plasma/plasmoids/org.kde.plasma.icon/contents/ui/main.qml	2023-05-09 12:38:49.000000000 +0100
++++ /home/exxos/claude/audit/theme-audit/plasmoids/plasmoids/org.kde.plasma.icon/contents/ui/main.qml	2026-09-01 22:44:38.000000000 +0100
+@@ -43,10 +43,34 @@
      Accessible.description: toolTip.subText
      Accessible.role: Accessible.Button
-
+ 
 -    Layout.minimumWidth: Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? height : PlasmaCore.Units.iconSizes.small
-+    // --- LOCAL OVERRIDE (theme work, 2026-08-30) -----------------------------
-+    // Upstream hardcodes this applet square to the panel height in a horizontal
-+    // panel:
-+    //     Layout.minimumWidth: formFactor === Horizontal ? height : ...
-+    // On a 48px panel that forces a ~50px slot around a 32px icon, i.e. ~20px
-+    // gaps between quick-launch icons, with NO setting anywhere to change it.
++    // --- EXXOS LOCAL OVERRIDE, reapplied for Plasma 5.27 --------------------
++    // Upstream forces this applet square to the panel height in a horizontal
++    // panel, so on a 48px panel a 32px icon sits in a ~50px slot and the
++    // quick-launch icons end up ~20px apart, with no setting anywhere.
 +    //
-+    // compactSlot narrows the slot without shrinking the icon. PlasmaCore.
-+    // IconItem fills the applet and snaps to the largest standard icon size
-+    // that fits, so 36 still yields a 32px icon while cutting the gap to ~9px.
-+    // Measured: slot 50 -> gaps 22px | slot 40 -> 13px | slot 36 -> 9px, icon
-+    // stays 32px at 40, 38 and 36; at 24 the icon drops to 22px. 38 chosen for a
-+    // slightly roomier look than 36.
++    // exxosSlotWidth narrows the slot without shrinking the icon: IconItem
++    // fills the applet and snaps to the largest standard size that fits, so
++    // 38 still yields a 32px icon while cutting the gap to about 9px.
++    // exxosSpacing adds a margin either side.
 +    //
-+    // Revert: rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.icon
-+    // then quit and restart plasmashell.
-+    readonly property int compactSlot: 38
++    // Both are real config keys now (contents/config/main.xml), so
++    // panel-tools/set-quicklaunch-icons.sh can set them on every launcher at
++    // once rather than this being a hardcoded number.
++    //
++    // 5.27 renamed the global `units` / `plasmoid` context objects to
++    // PlasmaCore.Units / Plasmoid, which is why the 5.20 patch stopped applying.
++    readonly property int exxosSlot: Plasmoid.configuration.exxosSlotWidth > 0
++                                   ? Plasmoid.configuration.exxosSlotWidth : height
++    readonly property int exxosGap: Plasmoid.configuration.exxosSpacing
 +
-+    Layout.minimumWidth: Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? compactSlot : PlasmaCore.Units.iconSizes.small
-+    Layout.preferredWidth: Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? compactSlot : -1
++    Layout.leftMargin: exxosGap
++    Layout.rightMargin: exxosGap
++
++    Layout.minimumWidth: Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? exxosSlot : PlasmaCore.Units.iconSizes.small
      Layout.minimumHeight: Plasmoid.formFactor === PlasmaCore.Types.Vertical ? width : (PlasmaCore.Units.iconSizes.small + 2 * PlasmaCore.Theme.mSize(PlasmaCore.Theme.defaultFont).height)
-
+ 
 -    Layout.maximumWidth: inPanel ? PlasmaCore.Units.iconSizeHints.panel : -1
-+    Layout.maximumWidth: inPanel ? (Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? compactSlot : PlasmaCore.Units.iconSizeHints.panel) : -1
++    Layout.maximumWidth: inPanel ? (Plasmoid.formFactor === PlasmaCore.Types.Horizontal
++                                    ? exxosSlot : PlasmaCore.Units.iconSizeHints.panel) : -1
      Layout.maximumHeight: inPanel ? PlasmaCore.Units.iconSizeHints.panel : -1
-
+ 
      hoverEnabled: true

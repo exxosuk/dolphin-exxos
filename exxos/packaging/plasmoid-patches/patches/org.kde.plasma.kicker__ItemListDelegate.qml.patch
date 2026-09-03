@@ -1,35 +1,35 @@
---- a/contents/ui/ItemListDelegate.qml
-+++ b/contents/ui/ItemListDelegate.qml
-@@ -8,6 +8,7 @@
-
+--- /usr/share/plasma/plasmoids/org.kde.plasma.kicker/contents/ui/ItemListDelegate.qml	2023-05-09 12:37:55.000000000 +0100
++++ /home/exxos/claude/audit/theme-audit/plasmoids/plasmoids/org.kde.plasma.kicker/contents/ui/ItemListDelegate.qml	2026-09-01 20:02:46.000000000 +0100
+@@ -7,6 +7,7 @@
+ import QtQuick 2.15
+ 
  import org.kde.plasma.components 2.0 as PlasmaComponents
- import org.kde.plasma.core 2.0 as PlasmaCore
 +import QtGraphicalEffects 1.0   // LOCAL OVERRIDE: recolour the submenu arrow
-
+ import org.kde.plasma.core 2.0 as PlasmaCore
+ 
  import "code/tools.js" as Tools
-
 @@ -198,6 +199,7 @@
          }
-
+ 
          PlasmaComponents.Label {
 +            color: "#1a1a1a"   // LOCAL OVERRIDE: dark text for the light menu backdrop
              id: label
-
+ 
              enabled: !isParent || (isParent && item.hasChildren)
 @@ -224,10 +226,20 @@
              height: width
-
+ 
              visible: item.hasChildren
 -            opacity: (item.ListView.view.currentIndex === index) ? 1.0 : 0.4
 +
-+            // --- LOCAL OVERRIDE (theme work 2026-08-30) --------------------
++            // --- LOCAL OVERRIDE (theme work, reapplied for Plasma 5.27) ----
 +            // Two things made the submenu arrows nearly invisible on the light
 +            // menu backdrop: upstream draws them at 0.4 opacity unless the row
 +            // is selected, and the Plasma theme tints monochrome SVGs light
 +            // because Se7enAeroStyle is a dark theme. Raise the resting opacity
 +            // and recolour the SVG dark via a layer effect.
 +            opacity: (item.ListView.view.currentIndex === index) ? 1.0 : 0.85
-
+ 
              svg: arrows
              elementId: (Qt.application.layoutDirection === Qt.RightToLeft) ? "left-arrow" : "right-arrow"
 +
@@ -37,4 +37,4 @@
 +            layer.effect: ColorOverlay { color: "#1a1a1a" }
          }
      }
-
+ 

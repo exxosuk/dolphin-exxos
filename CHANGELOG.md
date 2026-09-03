@@ -8,6 +8,57 @@ minor number with each push to the repository. `exxos-desktop` and
 
 ## Unreleased
 
+### exxos-theme-apply — fixed, was broken on a clean install
+
+`exxos-theme-apply` only set 4 of the 12 config keys the theme needs. On the
+machine it was built on everything was already configured, so the gaps were
+invisible. On a fresh install the start menu stayed stock, quick-launch icons
+had large gaps, the widget style was wrong, and the title bar buttons still
+had the KDE default layout.
+
+Fixed:
+* Sets all KWin settings: button layout (empty left, IAX right), blur on,
+  dim-inactive off, window placement centred.
+* Sets `widgetStyle=plastique` (was staying at Breeze).
+* Sets `LookAndFeelPackage` so System Settings shows Exxos as active.
+* Runs `rebuild-overrides.sh` to apply the plasmoid patches (start menu
+  white backdrop, quick-launch icon spacing, taskbar single-row layout).
+* Sets up the autostart entry for login-time patch rebuilds after Plasma
+  upgrades.
+* Clears the Plasma theme cache so the new theme renders immediately.
+* The `--undo` command now reverses all of the above, not just the four
+  keys it used to know about.
+
+### Packaging fixes
+
+* **Plasmoid patches regenerated for Plasma 5.27.5.** The shipped patches
+  were from 5.20.5 (MX 21) and silently failed on MX 23 because Plasma 5.27
+  renamed `units` to `PlasmaCore.Units`. Patches are now generated from the
+  working PC's actual overrides and stored in the repo as the source of truth.
+* **Removed the showdesktop patch.** The working PC does not patch it — the
+  override was a copy identical to the system file.
+* **Shell scripts in the package are now executable.** `normalise_modes` was
+  setting everything to 644, so `rebuild-overrides.sh` and `check-on-login.sh`
+  could not be executed by `exxos-theme-apply`.
+* **Repo patches overlay the bundled copies.** `build-deb.sh` now copies the
+  repo's patches into the package, so stale patches from the build machine's
+  home directory cannot sneak in.
+
+### exxos-icons
+
+* **814 of 4703 SVGs in the icon theme were malformed** (Adobe `a:` namespace
+  used without being declared). Qt refused to parse them, so those icons showed
+  as blank. The repaired icon theme from the working PC — with all fixes from
+  the theme work sessions — should be used as the package source.
+
+### wincupl-mx-linux
+
+* **WinCUPL exited silently on a fresh install.** The installer checked for
+  `wine` but not `wine32:i386`. On a 64-bit system, `apt install wine` gives
+  only wine64; the 32-bit PE executable needs `wine32` for WoW64. The process
+  started, failed to load `syswow64/ntdll.dll`, and exited with no window and
+  no error. Now installs `wine32:i386` when missing.
+
 * The README now says outright that this is not a faithful reproduction of
   Windows 7. It reproduces one personal Windows 7 setup — the taskbar, Start
   menu and colours as they were arranged there — not the stock layout. What
