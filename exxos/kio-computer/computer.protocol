@@ -1,0 +1,14 @@
+[Protocol]
+exec=kf5/kio/computer
+protocol=computer
+input=none
+output=filesystem
+listing=Name,Type,Size
+reading=false
+writing=false
+deleting=false
+makedir=false
+moving=false
+Icon=computer
+Class=:local
+maxInstances=1

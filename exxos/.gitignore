@@ -1,0 +1,10 @@
+# Build output, never source
+out/
+apt/
+stage/
+stage-icons/
+build/
+build-pkg/
+*.so
+*.deb
+*.bak*

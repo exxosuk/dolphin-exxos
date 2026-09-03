@@ -1,0 +1,32 @@
+# Exxos/Win7: notice when a disk is put into a drive that never says so.
+#
+# A USB floppy reports no asynchronous media change and is not polled, so
+# swapping a disk is invisible to the whole desktop until something unrelated
+# makes udisks re-examine its devices. Measured on this machine, with a floppy
+# physically in the drive:
+#
+#     /sys/block/sdg/size          1440      <- the kernel knows
+#     udisks2 Block.Size           0         <- udisks does not
+#
+# and org.freedesktop.UDisks2.Block.Rescan does NOT close that gap: the size
+# stayed 0 immediately after a rescan. udisks updates from uevents, and no
+# uevent is ever emitted, because nothing is polling the drive.
+#
+# The optical drive works precisely because it IS polled -- /etc/udev/rules.d/
+# 61-optical-polling-rules.rules sets events_poll_msecs on it. This does the
+# same for the drives that were left out. The kernel's poll is a cheap "has the
+# medium changed?" question, NOT a read of the disk, so an idle drive is not
+# made to seek.
+#
+# sr* (optical) is deliberately not matched: it is polled already, and asking
+# an optical drive to rescan closes the tray.
+#
+# INTERVAL. 5000 ms, not the 2000 this first shipped with. The kernel's check
+# is a "has the medium changed?" question rather than a read, but a USB floppy
+# answers it by moving its head, and at two seconds that is a click every two
+# seconds for as long as the machine is on -- audible across a room and
+# needless wear on a drive nobody is using. Five seconds still notices a swap
+# before anyone has finished putting the disk down. install-media-polling.sh
+# takes --interval to change it.
+ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="sd[a-z]", ATTR{removable}=="1", ATTR{events_poll_msecs}=="-1", ATTR{events_poll_msecs}="5000"
+ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="mmcblk[0-9]", ATTR{removable}=="1", ATTR{events_poll_msecs}=="-1", ATTR{events_poll_msecs}="5000"

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Exxos Automount
+Comment=Mount fixed data partitions at login so capacity bars show immediately
+Exec=~/theme-work/mx23/exxos-automount.sh
+Terminal=false
+NoDisplay=true
+X-KDE-autostart-phase=2

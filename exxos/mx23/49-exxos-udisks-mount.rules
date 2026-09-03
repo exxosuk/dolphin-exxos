@@ -1,0 +1,32 @@
+/* Mount internal drives without a password.
+ *
+ * udisks2 ships org.freedesktop.udisks2.filesystem-mount-system as
+ * auth_admin_keep, so every internal (non-removable) partition -- DGHJ, NVME,
+ * WD_BACKUP, QVO BACKUP, WIN7 here -- prompts for the admin password. The
+ * "keep" only lasts a few minutes, which is why it keeps coming back.
+ * Removable media is already silent: that is filesystem-mount, already "yes".
+ *
+ * polkit on MX 23 is version 122 and does NOT read .pkla files -- the old
+ * /etc/polkit-1/localauthority format is ignored with no error. This is the
+ * JavaScript rules.d format, which is the only one that works here.
+ *
+ * Scope: user chris, in an active local session, mount/unmount only.
+ *
+ * SECURITY: any process running as chris can then mount internal filesystems
+ * without prompting. That matches how Windows behaves on a single-user
+ * desktop, but it IS a relaxation of the default.
+ *
+ * Undo:  sudo rm /etc/polkit-1/rules.d/49-exxos-udisks-mount.rules
+ */
+polkit.addRule(function(action, subject) {
+    if (subject.user !== "chris" || !subject.active || !subject.local) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    switch (action.id) {
+        case "org.freedesktop.udisks2.filesystem-mount-system":
+        case "org.freedesktop.udisks2.filesystem-unmount-others":
+        case "org.freedesktop.udisks2.filesystem-mount":
+            return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

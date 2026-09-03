@@ -1,0 +1,84 @@
+#!/bin/bash
+# Apply the Windows 7 look to the CURRENT user's Plasma session.
+#
+#   exxos-theme-apply           apply
+#   exxos-theme-apply --undo    put Breeze back
+#
+# Why this is a separate command rather than part of installing the package: a
+# theme lives in each user's own configuration, and a package installs once for
+# everybody as root. Writing into someone's ~/.config from a postinst is how
+# packages break other people's desktops.
+#
+# Settings are written KEY BY KEY with kwriteconfig5, never by copying whole
+# config files over the top. Copying kdeglobals or kwinrc wholesale would
+# silently wipe everything else that is configured -- fonts, shortcuts, monitor
+# layout, panels -- and the user would have no idea what had gone.
+set -e
+SRC=/usr/share/exxos
+[ -d "$SRC" ] || { echo "Theme files are missing: $SRC" >&2; exit 1; }
+[ "$(id -u)" != 0 ] || { echo "Run me as your normal user, NOT with sudo." >&2; exit 1; }
+
+undo() {
+    kwriteconfig5 --file kdeglobals --group General --key ColorScheme BreezeLight
+    kwriteconfig5 --file kdeglobals --group Icons --key Theme breeze
+    kwriteconfig5 --file plasmarc  --group Theme  --key name default
+    kwriteconfig5 --file kwinrc    --group org.kde.kdecoration2 --key library org.kde.breeze
+    echo "Breeze restored. Log out and back in."
+    exit 0
+}
+[ "$1" = "--undo" ] && undo
+
+echo "Copying theme files into your home..."
+for d in plasma/look-and-feel plasma/desktoptheme aurorae/themes color-schemes; do
+    [ -d "$SRC/$d" ] || continue
+    mkdir -p "$HOME/.local/share/$d"
+    if ! cp -a "$SRC/$d/." "$HOME/.local/share/$d/" 2>/tmp/exxos-copy-err.$$; then
+        echo
+        echo "  ! Could not read some theme files:" >&2
+        sed 's/^/    /' /tmp/exxos-copy-err.$$ >&2
+        rm -f /tmp/exxos-copy-err.$$
+        echo "    That is a fault in the package, not in your machine." >&2
+        echo "    Report it, or work around it with:" >&2
+        echo "      sudo chmod -R a+rX $SRC" >&2
+        exit 1
+    fi
+    rm -f /tmp/exxos-copy-err.$$
+    echo "  + $d"
+done
+
+echo "Applying settings..."
+
+# NOTHING is done here about panel visibility, and that is deliberate.
+#
+# Dolphin shows the places panel by default, so a fresh install already has it.
+# It only disappears if somebody switches it off (F9, "Show Panels"), and that
+# choice is theirs to keep.
+#
+# Deleting the [MainWindow] State blob was tried as a way to force it back and
+# it does NOT work -- the panel stayed hidden -- while the blob also holds the
+# window size and toolbar layout, which people arrange on purpose. F9 restores
+# it in one keystroke; a theme script has no business overruling that.
+
+kwriteconfig5 --file kdeglobals --group General --key ColorScheme Exxos
+kwriteconfig5 --file plasmarc   --group Theme   --key name Se7enAeroStyle
+kwriteconfig5 --file kwinrc     --group org.kde.kdecoration2 --key library org.kde.kwin.aurorae
+kwriteconfig5 --file kwinrc     --group org.kde.kdecoration2 --key theme __aurorae__svg__exposeair
+
+# The icon theme normally arrives with the exxos-icons package, but it may
+# also have been dropped into the user's own icon directory by hand, so look
+# in both. Without it the desktop is not broken, it just falls back to Breeze
+# and does not look like the thing it is meant to look like -- worth saying
+# rather than leaving someone to wonder.
+ICON_NAME=Win7-plasma5up-scalable-icontheme-blackysgate.de
+if [ -d "/usr/share/icons/$ICON_NAME" ] || [ -d "$HOME/.local/share/icons/$ICON_NAME" ]; then
+    kwriteconfig5 --file kdeglobals --group Icons --key Theme "$ICON_NAME"
+    echo "  + icon theme found and selected"
+else
+    echo
+    echo "  ! The icon theme is not installed, so icons will stay Breeze."
+    echo "    Install it with:  sudo apt install exxos-icons"
+fi
+
+echo
+echo "Done. Log out and back in for the window decorations to take effect."
+echo "Undo with: exxos-theme-apply --undo"
