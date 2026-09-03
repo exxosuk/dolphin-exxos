@@ -25,6 +25,8 @@
 #include <QDir>
 #include <QFontDatabase>
 #include <KFilePlacesModel>
+#include <KIO/StatJob>
+#include <KIO/Job>
 #include <QMenu>
 #include <KSharedConfig>
 #include <KConfigGroup>
@@ -154,7 +156,31 @@ QUrl DolphinSearchBox::urlForSearching() const
             query.addQueryItem(QStringLiteral("checkContent"), QStringLiteral("yes"));
         }
 
-        query.addQueryItem(QStringLiteral("url"), searchPath().url());
+        /* Never hand the worker a computer:/ URL. It builds every result by
+           appending names to the path it was given, so the results come back
+           as computer:/<device>/... - which Dolphin will not copy, Winamp
+           cannot open and a drag into any non-KIO program delivers nothing.
+           Resolve it to where the drive actually is first. A search from the
+           Computer root means "look everywhere", which is the root of the
+           filesystem the drives are mounted under. */
+        QUrl workerPath = searchPath();
+        if (workerPath.scheme() == QLatin1String("computer")) {
+            if (workerPath.path().length() > 1) {
+                KIO::StatJob* job = KIO::statDetails(workerPath, KIO::StatJob::SourceSide,
+                                                     KIO::StatBasic, KIO::HideProgressInfo);
+                if (job->exec()) {
+                    const QString target =
+                        job->statResult().stringValue(KIO::UDSEntry::UDS_TARGET_URL);
+                    if (!target.isEmpty()) {
+                        workerPath = QUrl(target);
+                    }
+                }
+            } else {
+                workerPath = QUrl::fromLocalFile(QStringLiteral("/"));
+            }
+        }
+
+        query.addQueryItem(QStringLiteral("url"), workerPath.url());
         query.addQueryItem(QStringLiteral("title"), queryTitle(m_searchInput->text()));
 
         url.setQuery(query);

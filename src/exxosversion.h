@@ -5,5 +5,5 @@
  */
 #ifndef EXXOSVERSION_H
 #define EXXOSVERSION_H
-#define EXXOS_EDITION_VERSION "1.8.2"
+#define EXXOS_EDITION_VERSION "1.8.3"
 #endif
