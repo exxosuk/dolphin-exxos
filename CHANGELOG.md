@@ -51,14 +51,6 @@ Fixed:
   as blank. The repaired icon theme from the working PC — with all fixes from
   the theme work sessions — should be used as the package source.
 
-### wincupl-mx-linux
-
-* **WinCUPL exited silently on a fresh install.** The installer checked for
-  `wine` but not `wine32:i386`. On a 64-bit system, `apt install wine` gives
-  only wine64; the 32-bit PE executable needs `wine32` for WoW64. The process
-  started, failed to load `syswow64/ntdll.dll`, and exited with no window and
-  no error. Now installs `wine32:i386` when missing.
-
 * The README now says outright that this is not a faithful reproduction of
   Windows 7. It reproduces one personal Windows 7 setup — the taskbar, Start
   menu and colours as they were arranged there — not the stock layout. What
