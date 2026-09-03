@@ -24,7 +24,11 @@
 #include <QButtonGroup>
 #include <QDir>
 #include <QFontDatabase>
+#include <QMenu>
+#include <KSharedConfig>
+#include <KConfigGroup>
 #include <QHBoxLayout>
+#include <QProgressBar>
 #include <QIcon>
 #include <QKeyEvent>
 #include <QLineEdit>
@@ -42,7 +46,10 @@ DolphinSearchBox::DolphinSearchBox(QWidget* parent) :
     m_topLayout(nullptr),
     m_searchInput(nullptr),
     m_stopButton(nullptr),
+    m_searchProgress(nullptr),
     m_saveSearchAction(nullptr),
+    m_historyAction(nullptr),
+    m_history(),
     m_optionsScrollArea(nullptr),
     m_fileNameButton(nullptr),
     m_contentButton(nullptr),
@@ -262,8 +269,41 @@ bool DolphinSearchBox::eventFilter(QObject* obj, QEvent* event)
     return QObject::eventFilter(obj, event);
 }
 
+void DolphinSearchBox::rememberSearch(const QString& text)
+{
+    if (text.trimmed().isEmpty()) {
+        return;
+    }
+    m_history.removeAll(text);
+    m_history.prepend(text);
+    while (m_history.count() > 20) {
+        m_history.removeLast();
+    }
+    KConfigGroup group(KSharedConfig::openConfig(), "Search");
+    group.writeEntry("History", m_history);
+    group.sync();
+}
+
+void DolphinSearchBox::showHistoryMenu()
+{
+    if (m_history.isEmpty()) {
+        return;
+    }
+
+    QMenu menu(this);
+    for (const QString& entry : qAsConst(m_history)) {
+        QAction* action = menu.addAction(entry);
+        connect(action, &QAction::triggered, this, [this, entry]() {
+            setText(entry);
+            emitSearchRequest();
+        });
+    }
+    menu.exec(m_searchInput->mapToGlobal(QPoint(0, m_searchInput->height())));
+}
+
 void DolphinSearchBox::emitSearchRequest()
 {
+    rememberSearch(m_searchInput->text());
     m_startSearchTimer->stop();
     m_startedSearching = true;
     m_saveSearchAction->setEnabled(true);
@@ -274,6 +314,9 @@ void DolphinSearchBox::setSearchRunning(bool running)
 {
     if (m_stopButton) {
         m_stopButton->setVisible(running);
+    }
+    if (m_searchProgress) {
+        m_searchProgress->setVisible(running);
     }
 }
 
@@ -379,6 +422,16 @@ void DolphinSearchBox::init()
     m_saveSearchAction->setText(i18nc("action:button", "Save this search to quickly access it again in the future"));
     m_saveSearchAction->setEnabled(false);
     m_searchInput->addAction(m_saveSearchAction, QLineEdit::TrailingPosition);
+
+    // Windows keeps the last searches a click away rather than making you
+    // retype them. The list lives in dolphinrc, so it survives a restart.
+    m_history = KConfigGroup(KSharedConfig::openConfig(), "Search").readEntry("History", QStringList());
+    m_historyAction = new QAction(this);
+    m_historyAction->setIcon(QIcon::fromTheme(QStringLiteral("go-down-search")));
+    m_historyAction->setText(i18nc("@action:inmenu", "Recent Searches"));
+    m_historyAction->setToolTip(i18nc("@info:tooltip", "Show the last 20 searches"));
+    connect(m_historyAction, &QAction::triggered, this, &DolphinSearchBox::showHistoryMenu);
+    m_searchInput->addAction(m_historyAction, QLineEdit::TrailingPosition);
     connect(m_saveSearchAction, &QAction::triggered, this, &DolphinSearchBox::slotSearchSaved);
 
     // Create close button
@@ -393,9 +446,21 @@ void DolphinSearchBox::init()
     // was Escape, which closes the search and throws the results away.
     m_stopButton = new QToolButton(this);
     m_stopButton->setIcon(QIcon::fromTheme(QStringLiteral("process-stop")));
-    m_stopButton->setAutoRaise(true);
+    m_stopButton->setText(i18nc("action:button", "Stop"));
+    m_stopButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_stopButton->setIconSize(QSize(22, 22));
     m_stopButton->setToolTip(i18nc("@info:tooltip", "Stop searching, keeping the results found so far"));
     m_stopButton->hide();
+
+    // A search over a big tree takes a while and Dolphin's own progress lives
+    // in the status bar, at the far corner of the window from where you are
+    // looking. Put an indicator on the search bar itself, where the search is.
+    m_searchProgress = new QProgressBar(this);
+    m_searchProgress->setRange(0, 0);            // busy indicator, not a percentage
+    m_searchProgress->setTextVisible(false);
+    m_searchProgress->setFixedWidth(110);
+    m_searchProgress->setMaximumHeight(m_stopButton->sizeHint().height() - 6);
+    m_searchProgress->hide();
     connect(m_stopButton, &QToolButton::clicked, this, [this]() {
         Q_EMIT stopSearchRequest();
     });
@@ -404,7 +469,6 @@ void DolphinSearchBox::init()
     QHBoxLayout* searchInputLayout = new QHBoxLayout();
     searchInputLayout->setContentsMargins(0, 0, 0, 0);
     searchInputLayout->addWidget(m_searchInput);
-    searchInputLayout->addWidget(m_stopButton);
     searchInputLayout->addWidget(closeButton);
 
     // Create "Filename" and "Content" button
@@ -475,6 +539,8 @@ void DolphinSearchBox::init()
     optionsLayout->addWidget(new KSeparator(Qt::Vertical, this));
     optionsLayout->addWidget(moreSearchToolsButton);
     optionsLayout->addStretch(1);
+    optionsLayout->addWidget(m_stopButton);
+    optionsLayout->addWidget(m_searchProgress);
 
     m_optionsScrollArea = new QScrollArea(this);
     m_optionsScrollArea->setFrameShape(QFrame::NoFrame);

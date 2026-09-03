@@ -9,12 +9,14 @@
 
 #include <QUrl>
 #include <QWidget>
+#include <QStringList>
 
 class DolphinFacetsWidget;
 class DolphinQuery;
 class QLineEdit;
 class KSeparator;
 class QToolButton;
+class QProgressBar;
 class QScrollArea;
 class QLabel;
 class QVBoxLayout;
@@ -130,6 +132,12 @@ Q_SIGNALS:
 
 private Q_SLOTS:
     void emitSearchRequest();
+
+    /** Shows the last searches as a menu under the search field. */
+    void showHistoryMenu();
+
+    /** Records a search in the history, newest first, capped and de-duplicated. */
+    void rememberSearch(const QString& text);
     void emitCloseRequest();
     void slotConfigurationChanged();
     void slotSearchTextChanged(const QString& text);
@@ -167,7 +175,10 @@ private:
 
     QLineEdit* m_searchInput;
     QToolButton* m_stopButton;
+    QProgressBar* m_searchProgress;
     QAction* m_saveSearchAction;
+    QAction* m_historyAction;
+    QStringList m_history;
     QScrollArea* m_optionsScrollArea;
     QToolButton* m_fileNameButton;
     QToolButton* m_contentButton;
