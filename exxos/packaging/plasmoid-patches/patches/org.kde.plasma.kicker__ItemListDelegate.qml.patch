@@ -26,7 +26,7 @@
 +            // Two things made the submenu arrows nearly invisible on the light
 +            // menu backdrop: upstream draws them at 0.4 opacity unless the row
 +            // is selected, and the Plasma theme tints monochrome SVGs light
-+            // because Se7enAeroStyle is a dark theme. Raise the resting opacity
++            // because the Exxos Plasma style is a dark theme. Raise the resting opacity
 +            // and recolour the SVG dark via a layer effect.
 +            opacity: (item.ListView.view.currentIndex === index) ? 1.0 : 0.85
  

@@ -71,7 +71,7 @@ echo "Applying settings..."
 
 # --- colour scheme and plasma style ---
 kwriteconfig5 --file kdeglobals --group General --key ColorScheme Exxos
-kwriteconfig5 --file plasmarc   --group Theme   --key name Se7enAeroStyle
+kwriteconfig5 --file plasmarc   --group Theme   --key name Exxos
 
 # --- widget style (plastique, not cde -- cde lacks menu hover highlight) ---
 kwriteconfig5 --file kdeglobals --group KDE --key widgetStyle plastique

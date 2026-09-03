@@ -117,7 +117,7 @@ theme() {
     echo "  + $(basename "$2")"
 }
 theme plasma/look-and-feel "$HOME/.local/share/plasma/look-and-feel/com.exxos.win7"
-theme plasma/desktoptheme  "$HOME/.local/share/plasma/desktoptheme/Se7enAeroStyle"
+theme plasma/desktoptheme  "$HOME/.local/share/plasma/desktoptheme/Exxos"
 theme aurorae/themes       "$HOME/.local/share/aurorae/themes/exposeair"
 theme color-schemes        "$HOME/.local/share/color-schemes/Exxos.colors"
 

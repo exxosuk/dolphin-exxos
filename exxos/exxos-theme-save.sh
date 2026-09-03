@@ -41,7 +41,7 @@ for d in \
     "$HOME/.local/share/plasma/plasmoids/org.kde.plasma.icon" \
     "$HOME/.local/share/plasma/plasmoids/org.kde.plasma.showdesktop" \
     "$HOME/.local/share/plasma/plasmoids/org.kde.plasma.kicker" \
-    "$HOME/.local/share/plasma/desktoptheme/Se7enAeroStyle" \
+    "$HOME/.local/share/plasma/desktoptheme/Exxos" \
     "$HOME/.local/share/aurorae/themes" \
     "$HOME/.local/share/color-schemes" \
     "$HOME/.local/share/plasma_icons" \
