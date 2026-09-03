@@ -50,6 +50,8 @@ DolphinSearchBox::DolphinSearchBox(QWidget* parent) :
     m_searchProgress(nullptr),
     m_saveSearchAction(nullptr),
     m_historyAction(nullptr),
+    m_recentButton(nullptr),
+    m_savedButton(nullptr),
     m_history(),
     m_optionsScrollArea(nullptr),
     m_fileNameButton(nullptr),
@@ -285,16 +287,11 @@ void DolphinSearchBox::rememberSearch(const QString& text)
     group.sync();
 }
 
-void DolphinSearchBox::showHistoryMenu()
+void DolphinSearchBox::showSavedMenu()
 {
     QMenu menu(this);
-
-    // Saved searches first - they were deliberately kept, so they outrank
-    // whatever happens to have been typed lately. The floppy button beside
-    // the field puts them in Places, which is where they are read back from.
     const QIcon savedIcon = QIcon::fromTheme(QStringLiteral("folder-saved-search-symbolic"));
     KFilePlacesModel* places = DolphinPlacesModelSingleton::instance().placesModel();
-    int savedCount = 0;
     for (int row = 0; row < places->rowCount(); ++row) {
         const QModelIndex index = places->index(row, 0);
         const QUrl url = places->url(index);
@@ -307,17 +304,16 @@ void DolphinSearchBox::showHistoryMenu()
             fromSearchUrl(url);
             emitSearchRequest();
         });
-        ++savedCount;
     }
-
-    if (savedCount > 0 && !m_history.isEmpty()) {
-        menu.addSeparator();
+    if (menu.isEmpty()) {
+        menu.addAction(i18nc("@item:inmenu", "No saved searches"))->setEnabled(false);
     }
+    menu.exec(m_savedButton->mapToGlobal(QPoint(0, m_savedButton->height())));
+}
 
-    if (savedCount == 0 && m_history.isEmpty()) {
-        return;
-    }
-
+void DolphinSearchBox::showHistoryMenu()
+{
+    QMenu menu(this);
     for (const QString& entry : qAsConst(m_history)) {
         QAction* action = menu.addAction(entry);
         connect(action, &QAction::triggered, this, [this, entry]() {
@@ -325,7 +321,10 @@ void DolphinSearchBox::showHistoryMenu()
             emitSearchRequest();
         });
     }
-    menu.exec(m_searchInput->mapToGlobal(QPoint(0, m_searchInput->height())));
+    if (menu.isEmpty()) {
+        menu.addAction(i18nc("@item:inmenu", "No recent searches"))->setEnabled(false);
+    }
+    menu.exec(m_recentButton->mapToGlobal(QPoint(0, m_recentButton->height())));
 }
 
 void DolphinSearchBox::emitSearchRequest()
@@ -453,12 +452,24 @@ void DolphinSearchBox::init()
     // Windows keeps the last searches a click away rather than making you
     // retype them. The list lives in dolphinrc, so it survives a restart.
     m_history = KConfigGroup(KSharedConfig::openConfig(), "Search").readEntry("History", QStringList());
-    m_historyAction = new QAction(this);
-    m_historyAction->setIcon(QIcon::fromTheme(QStringLiteral("go-down-search")));
-    m_historyAction->setText(i18nc("@action:inmenu", "Recent Searches"));
-    m_historyAction->setToolTip(i18nc("@info:tooltip", "Show the last 20 searches"));
-    connect(m_historyAction, &QAction::triggered, this, &DolphinSearchBox::showHistoryMenu);
-    m_searchInput->addAction(m_historyAction, QLineEdit::TrailingPosition);
+    // Two named lists rather than one mixed one: what you kept and what you
+    // happened to type are different things, and a menu that silently mixes
+    // them makes you read every line to tell which is which.
+    m_recentButton = new QToolButton(this);
+    m_recentButton->setText(i18nc("action:button", "Recent Searches"));
+    m_recentButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_recentButton->setIcon(QIcon::fromTheme(QStringLiteral("go-down-search")));
+    m_recentButton->setPopupMode(QToolButton::InstantPopup);
+    m_recentButton->setAutoRaise(true);
+    connect(m_recentButton, &QToolButton::clicked, this, &DolphinSearchBox::showHistoryMenu);
+
+    m_savedButton = new QToolButton(this);
+    m_savedButton->setText(i18nc("action:button", "Saved Searches"));
+    m_savedButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_savedButton->setIcon(QIcon::fromTheme(QStringLiteral("folder-saved-search-symbolic")));
+    m_savedButton->setPopupMode(QToolButton::InstantPopup);
+    m_savedButton->setAutoRaise(true);
+    connect(m_savedButton, &QToolButton::clicked, this, &DolphinSearchBox::showSavedMenu);
     connect(m_saveSearchAction, &QAction::triggered, this, &DolphinSearchBox::slotSearchSaved);
 
     // Create close button
@@ -565,9 +576,16 @@ void DolphinSearchBox::init()
     optionsLayout->addWidget(m_everywhereButton);
     optionsLayout->addWidget(new KSeparator(Qt::Vertical, this));
     optionsLayout->addWidget(moreSearchToolsButton);
+    optionsLayout->addWidget(new KSeparator(Qt::Vertical, this));
+    optionsLayout->addWidget(m_recentButton);
+    optionsLayout->addWidget(m_savedButton);
     optionsLayout->addStretch(1);
     optionsLayout->addWidget(m_stopButton);
     optionsLayout->addWidget(m_searchProgress);
+
+    // Two pixels of air under the row: without it the stop button and the
+    // busy bar sit flush against the column headers below them.
+    optionsLayout->setContentsMargins(0, 0, 0, 2);
 
     m_optionsScrollArea = new QScrollArea(this);
     m_optionsScrollArea->setFrameShape(QFrame::NoFrame);

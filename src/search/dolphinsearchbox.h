@@ -136,6 +136,9 @@ private Q_SLOTS:
     /** Shows the last searches as a menu under the search field. */
     void showHistoryMenu();
 
+    /** Shows the searches kept with the save button. */
+    void showSavedMenu();
+
     /** Records a search in the history, newest first, capped and de-duplicated. */
     void rememberSearch(const QString& text);
     void emitCloseRequest();
@@ -178,6 +181,8 @@ private:
     QProgressBar* m_searchProgress;
     QAction* m_saveSearchAction;
     QAction* m_historyAction;
+    QToolButton* m_recentButton;
+    QToolButton* m_savedButton;
     QStringList m_history;
     QScrollArea* m_optionsScrollArea;
     QToolButton* m_fileNameButton;
