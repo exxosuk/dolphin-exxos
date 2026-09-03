@@ -576,16 +576,7 @@ void DolphinSearchBox::init()
     optionsLayout->addWidget(m_everywhereButton);
     optionsLayout->addWidget(new KSeparator(Qt::Vertical, this));
     optionsLayout->addWidget(moreSearchToolsButton);
-    optionsLayout->addWidget(new KSeparator(Qt::Vertical, this));
-    optionsLayout->addWidget(m_recentButton);
-    optionsLayout->addWidget(m_savedButton);
     optionsLayout->addStretch(1);
-    optionsLayout->addWidget(m_stopButton);
-    optionsLayout->addWidget(m_searchProgress);
-
-    // Two pixels of air under the row: without it the stop button and the
-    // busy bar sit flush against the column headers below them.
-    optionsLayout->setContentsMargins(0, 0, 0, 2);
 
     m_optionsScrollArea = new QScrollArea(this);
     m_optionsScrollArea->setFrameShape(QFrame::NoFrame);
@@ -599,8 +590,23 @@ void DolphinSearchBox::init()
     m_topLayout = new QVBoxLayout(this);
     m_topLayout->setContentsMargins(0, Dolphin::LAYOUT_SPACING_SMALL, 0, 0);
     m_topLayout->setSpacing(Dolphin::LAYOUT_SPACING_SMALL);
+    // The options row lives in a scroll area with its horizontal scrollbar
+    // turned off, so anything past the right edge of a narrow window is
+    // clipped and unreachable - no scrollbar, no way to get at it. Stopping a
+    // search must not be reachable only on a wide window, so the stop button
+    // and the busy bar sit beside that scroll area rather than inside it.
+    QHBoxLayout* optionsRowLayout = new QHBoxLayout();
+    optionsRowLayout->setContentsMargins(0, 0, 0, 2);   // 2px clear of the headers below
+    optionsRowLayout->setSpacing(Dolphin::LAYOUT_SPACING_SMALL);
+    optionsRowLayout->addWidget(m_optionsScrollArea, 1);
+    optionsRowLayout->addWidget(new KSeparator(Qt::Vertical, this));
+    optionsRowLayout->addWidget(m_recentButton);
+    optionsRowLayout->addWidget(m_savedButton);
+    optionsRowLayout->addWidget(m_stopButton);
+    optionsRowLayout->addWidget(m_searchProgress);
+
     m_topLayout->addLayout(searchInputLayout);
-    m_topLayout->addWidget(m_optionsScrollArea);
+    m_topLayout->addLayout(optionsRowLayout);
     m_topLayout->addWidget(m_facetsWidget);
 
     loadSettings();
