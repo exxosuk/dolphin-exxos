@@ -15,6 +15,39 @@ If a fix ever appears absent again, check the window title says
 "Dolphin Exxos Edition" and `readlink /proc/<pid>/exe` points at
 `theme-work/dolphin-src/build/bin/dolphin`.
 
+## Wanted — not started
+
+### Favourites: a central hub in the Places panel
+
+A new **Favourites** section in Dolphin's Places panel, below My Computer, with
+a yellow star. It holds symbolic links to anything the user drops in it -- files,
+folders, whole drives -- so it works as one place to reach the things they use,
+the way the dock on their Windows 7 machine did.
+
+Ways in and out, all of which need to work:
+
+* Drag a file or folder onto the Favourites view on the right.
+* Right-click any file or folder -> Add to Favourites. Must work from an ordinary
+  listing, from the desktop, and from **search results** -- search is where it is
+  most useful, because the item is in front of you and its folder is not.
+* Right-click an entry in Favourites -> Remove from Favourites. Removing takes
+  away the link only, never the target.
+
+Notes for whoever builds it:
+
+* Symbolic links, not copies. A favourite that silently goes stale, or that
+  duplicates a file, is worse than no favourite.
+* A link whose target has gone should be visible as broken rather than
+  disappearing quietly or erroring on open -- the same argument as the padlock
+  on an unmounted drive.
+* Places entries come from `user-places.xbel`. Whether Favourites is a section
+  in that file or a directory of links under `~/.local/share/exxos/favourites`
+  shown through a custom entry is the first design decision. The directory is
+  probably simpler, survives Dolphin upgrades, and can be backed up.
+* "Add to Favourites" belongs next to "Send to Desktop (create shortcut)" in
+  `DolphinContextMenu::addItemContextMenu()`, which is already common to every
+  branch including search results.
+
 ## Open
 
 | # | Item | State |

@@ -10,7 +10,10 @@
 #   MAJOR  a deliberate line in the sand -- a rebase onto a new Dolphin, or a
 #          change that breaks how the thing is installed
 #   MINOR  what is published: bumped by push-release.sh, so anyone reading a
-#          version number can tell which published build they have
+#          version number can tell which published build they have.
+#          After 1.9 comes 1.10, NOT 2.0 -- these are three independent
+#          numbers, not decimals, so 1.10 is a later 1.x and nothing about
+#          it implies the break in compatibility that 2.0 would.
 #   PATCH  local work between publishes
 #
 # Writing it in one place and generating from there stops the number in the
