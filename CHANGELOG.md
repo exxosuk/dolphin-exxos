@@ -8,21 +8,7 @@ minor number with each push to the repository. `exxos-desktop` and
 
 ## Unreleased
 
-### 1.9.20 — the real Windows icons, and colours taken from Windows rather than guessed
-
-**Icons.** The Win7-style icon theme is a Linux-made imitation. Measured at 48px
-its folder body is `#EED56E` against Microsoft's `#D8C066` -- about 10% brighter
-and flatter, which is why folders washed out against a near-white file list.
-`exxos-win-icons` extracts the genuine icons from `imageres.dll` on a mounted
-Windows partition and installs them as a separate theme inheriting the Exxos
-one, so only the names it covers change. 630 files, about 8 MB, covering
-folders, recycle bin, documents, images, video, audio, fonts, mail, drives,
-optical media, camera, phone, printer, network folders, search, games and users.
-
-These icons are NOT shipped and will not be. They are Microsoft's, and the apt
-repository is public. The package carries the 6.5 KB extractor and nothing
-derived from Windows -- each machine takes icons from its own licensed
-installation.
+### 1.9.20 — colours and blur measured rather than guessed
 
 **Colours.** `exxos-win-colours` reads the palette out of a Windows registry
 hive, so the scheme now carries real values instead of approximations: window

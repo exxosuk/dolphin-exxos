@@ -77,9 +77,6 @@ install -D -m 755 "$TW/system-tools/exxos-win-colours" \
 install -D -m 755 "$TW/system-tools/exxos-gtk-colours" \
         "$STAGE/usr/bin/exxos-gtk-colours"
 
-install -D -m 755 "$TW/system-tools/exxos-win-icons" \
-        "$STAGE/usr/bin/exxos-win-icons"
-
 install -D -m 644 "$TW/system-tools/61-exxos-removable-polling.rules" \
         "$STAGE/etc/udev/rules.d/61-exxos-removable-polling.rules"
 
