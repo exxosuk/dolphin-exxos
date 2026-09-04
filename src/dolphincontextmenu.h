@@ -75,6 +75,9 @@ private:
     void addTrashContextMenu();
     void addTrashItemContextMenu();
     void addItemContextMenu();
+
+    /* Exxos/Win7: the "Send to Desktop (create shortcut)" entry. */
+    void addSendToDesktopAction();
     void addViewportContextMenu();
 
     void insertDefaultItemActions(const KFileItemListProperties&);

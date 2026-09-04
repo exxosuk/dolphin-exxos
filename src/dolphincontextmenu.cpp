@@ -23,6 +23,7 @@
 #include <KConfigGroup>
 #include <KFileItemListProperties>
 #include <KHamburgerMenu>
+#include <KIO/CopyJob>
 #include <KIO/EmptyTrashJob>
 #include <KIO/JobUiDelegate>
 #include <KIO/Paste>
@@ -44,6 +45,7 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QStandardPaths>
 #include <QKeyEvent>
 
 DolphinContextMenu::DolphinContextMenu(DolphinMainWindow* parent,
@@ -441,6 +443,15 @@ void DolphinContextMenu::addItemContextMenu()
         addOpenWithActions();
     }
 
+    /* Exxos/Win7: "Send to Desktop (create shortcut)".
+
+       Windows puts this under Send To, and it is the one entry from that menu
+       people actually reach for. KIO::link is exactly the right operation: a
+       symlink for a local file, a .desktop link for anything remote, with name
+       clashes and error reporting already handled -- which is why this does not
+       call symlink() itself. */
+    addSendToDesktopAction();
+
     insertDefaultItemActions(selectedItemsProps);
 
     addAdditionalActions(selectedItemsProps);
@@ -457,6 +468,39 @@ void DolphinContextMenu::addItemContextMenu()
     addSeparator();
     QAction* propertiesAction = m_mainWindow->actionCollection()->action(QStringLiteral("properties"));
     addAction(propertiesAction);
+}
+
+void DolphinContextMenu::addSendToDesktopAction()
+{
+    if (m_selectedItems.isEmpty()) {
+        return;
+    }
+    /* computer:/ entries are devices, not files -- there is nothing to link. */
+    if (m_fileInfo.url().scheme() == QLatin1String("computer")) {
+        return;
+    }
+
+    const QString desktopPath = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+    if (desktopPath.isEmpty()) {
+        return;
+    }
+    const QUrl desktopUrl = QUrl::fromLocalFile(desktopPath);
+
+    /* Offering it for something already sitting on the desktop just makes
+       "file (link)" next to the file. */
+    if (m_selectedItems.count() == 1
+        && KIO::upUrl(m_fileInfo.url()).matches(desktopUrl, QUrl::StripTrailingSlash)) {
+        return;
+    }
+
+    addSeparator();
+    addAction(QIcon::fromTheme(QStringLiteral("emblem-symbolic-link")),
+              i18nc("@action:inmenu", "Send to Desktop (create shortcut)"),
+              [this, desktopUrl]() {
+        KIO::CopyJob *job = KIO::link(m_selectedItems.urlList(), desktopUrl);
+        KJobWidgets::setWindow(job, m_mainWindow);
+        job->uiDelegate()->setAutoErrorHandlingEnabled(true);
+    });
 }
 
 void DolphinContextMenu::addViewportContextMenu()

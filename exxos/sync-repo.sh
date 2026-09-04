@@ -81,9 +81,15 @@ fi
 if [ "$MODE" = "--to-repo" ]; then
     # The scrub guard. Copying first and grepping after is how personal data
     # ends up in a commit that then has to be rewritten.
-    hits=$(grep -rInE "$LEAKS" "$WORK/dolphin-src/src" "$WORK/kio-computer" \
-                 "$WORK"/*.md "$WORK/dolphin-src/dolphin-exxos" 2>/dev/null \
-           | grep -v '/THEME-LOG.md:')
+    # Scan exactly what would be copied, nothing else. Scanning whole
+    # directories instead reported the working copy's own .bak files -- which
+    # are never published -- and refused a clean tree.
+    targets=""
+    for pair in $MAP; do
+        w="$WORK/${pair#*:}"
+        [ -e "$w" ] && targets="$targets $w"
+    done
+    hits=$(grep -rInE "$LEAKS" $targets 2>/dev/null | grep -v '/THEME-LOG.md:')
     if [ -n "$hits" ]; then
         echo "REFUSING to copy into the checkout -- this would publish machine detail:" >&2
         echo "$hits" | head -20 | sed 's/^/   /' >&2
