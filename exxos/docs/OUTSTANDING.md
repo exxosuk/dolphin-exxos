@@ -86,6 +86,25 @@ Notes for whoever builds it:
   `DolphinContextMenu::addItemContextMenu()`, which is already common to every
   branch including search results.
 
+### Bookmark checker — not started
+
+A standalone tool, not part of Dolphin. Walks a browser's bookmarks and reports
+which are worth keeping.
+
+* Fetch each one and record what happened: loaded, gone, timed out, redirected
+  elsewhere.
+* Compare the page title now against the title stored in the bookmark. A site
+  that has been let go and picked up by a squatter still returns 200 -- the
+  title is what gives it away, so a bookmark saved as one thing and now titled
+  something unrelated is the signal, not the status code.
+* Group the results rather than deleting anything: dead, redirected, title
+  changed, fine. Deleting is the user's call, and a slow or temporarily down
+  site is not a dead one.
+* Rate-limit and run it over a long period. A few thousand bookmarks fetched at
+  speed looks like a scraper and gets the machine blocked.
+* Works on the exported bookmarks HTML, so it needs no browser and cannot
+  damage a profile.
+
 ## How this project is kept
 
 * **Changelog as you go.** An entry goes under `## Unreleased` when the change
