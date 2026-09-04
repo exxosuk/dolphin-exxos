@@ -39,6 +39,13 @@ exxos/VERSION:VERSION
 exxos/bump-version.sh:bump-version.sh
 exxos/deploy.sh:deploy.sh
 exxos/gen-computer-view.sh:gen-computer-view.sh
+exxos/packaging/build-deb.sh:packaging/build-deb.sh
+exxos/packaging/build-icons-deb.sh:packaging/build-icons-deb.sh
+exxos/packaging/publish-apt.sh:packaging/publish-apt.sh
+exxos/packaging/exxos-theme-apply:packaging/exxos-theme-apply
+exxos/packaging/svgtrim.py:packaging/svgtrim.py
+exxos/packaging/plasmoid-patches/:packaging/plasmoid-patches/
+exxos/system-tools/:system-tools/
 exxos/docs/CHANGELOG.md:CHANGELOG.md
 exxos/docs/DOLPHIN-PATCHES.md:DOLPHIN-PATCHES.md
 exxos/docs/MX23-UPGRADE.md:MX23-UPGRADE.md

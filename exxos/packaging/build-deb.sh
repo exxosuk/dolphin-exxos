@@ -60,6 +60,11 @@ install -D -m 644 "$TW/kio-computer/computer.protocol" \
         "$STAGE/usr/share/kservices5/computer.protocol"
 
 # --- 3. media-change polling ----------------------------------------------
+# Brightness is a live X property with no persistence of its own; this records
+# it and puts it back at login. See exxos/system-tools/exxos-brightness.
+install -D -m 755 "$TW/system-tools/exxos-brightness" \
+        "$STAGE/usr/bin/exxos-brightness"
+
 install -D -m 644 "$TW/system-tools/61-exxos-removable-polling.rules" \
         "$STAGE/etc/udev/rules.d/61-exxos-removable-polling.rules"
 
@@ -143,6 +148,10 @@ normalise_modes "$STAGE/usr/share/exxos"
 REPO_PATCHES="$HERE/plasmoid-patches"
 if [ -d "$REPO_PATCHES/patches" ]; then
     DEST="$STAGE/usr/share/exxos/plasma/look-and-feel/com.exxos.win7/bundle/plasmoid-patches"
+    # Clear first. Copying over the top leaves behind any patch the build
+    # machine's bundle has and the repo no longer does -- a showdesktop patch
+    # shipped that way, for a widget the patch set stopped managing.
+    rm -rf "$DEST/patches"
     mkdir -p "$DEST/patches"
     cp "$REPO_PATCHES"/patches/*.patch "$DEST/patches/"
     cp "$REPO_PATCHES/rebuild-overrides.sh" "$DEST/"

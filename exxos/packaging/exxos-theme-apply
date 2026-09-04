@@ -37,6 +37,8 @@ undo() {
            "$HOME/.local/share/plasma/plasmoids/org.kde.plasma.kicker" \
            "$HOME/.local/share/plasma/plasmoids/org.kde.plasma.taskmanager" 2>/dev/null
     rm -f "$HOME/.config/autostart/exxos-plasmoid-check.desktop" 2>/dev/null
+    rm -f "$HOME/.config/autostart/exxos-brightness.desktop" \
+          "$HOME/.config/autostart/mx-tweak-tray.desktop" 2>/dev/null
     rm -f "$HOME/.cache/plasma-svgelements"* "$HOME/.cache/plasma_theme_"*.kcache 2>/dev/null
     echo "Breeze restored. Log out and back in."
     exit 0
@@ -132,6 +134,46 @@ else
     echo
     echo "  ! Plasmoid patches not found at $PATCH_DIR"
     echo "    Start menu and quick-launch spacing will stay stock."
+fi
+
+# --- brightness, and the tray control for it ---
+#
+# xrandr --brightness is a live gamma-ramp property on the X server, not a
+# setting: nothing stores it and nothing reapplies it, so every logout loses it
+# and the screen comes back at full. exxos-brightness records what is actually
+# set, per output, and puts it back at login.
+if command -v exxos-brightness >/dev/null 2>&1; then
+    mkdir -p "$HOME/.config/autostart"
+    cat > "$HOME/.config/autostart/exxos-brightness.desktop" <<AUTOSTART
+[Desktop Entry]
+Type=Application
+Name=Restore screen brightness
+Comment=Puts back the brightness you last set, and remembers it when you change it
+Exec=exxos-brightness --watch
+Terminal=false
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=KDE;
+AUTOSTART
+    echo "  + brightness is remembered across a reboot"
+fi
+
+# MX Tweak's brightness systray does not autostart itself, so its icon does not
+# come back after a reboot. Only offered where MX Tweak is actually installed.
+if command -v mx-tweak >/dev/null 2>&1; then
+    mkdir -p "$HOME/.config/autostart"
+    cat > "$HOME/.config/autostart/mx-tweak-tray.desktop" <<AUTOSTART
+[Desktop Entry]
+Type=Application
+Name=Brightness Systray
+Comment=MX Tweak's brightness control in the system tray
+Exec=mx-tweak --tray
+Terminal=false
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=KDE;
+AUTOSTART
+    echo "  + brightness systray starts with the session"
 fi
 
 # --- clear Plasma theme caches so the new theme renders immediately ---
