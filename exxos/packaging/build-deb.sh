@@ -77,6 +77,15 @@ install -D -m 755 "$TW/system-tools/exxos-win-colours" \
 install -D -m 755 "$TW/system-tools/exxos-gtk-colours" \
         "$STAGE/usr/bin/exxos-gtk-colours"
 
+install -D -m 755 "$TW/system-tools/exxos-favourite" \
+        "$STAGE/usr/bin/exxos-favourite"
+
+# The desktop is Plasma's Folder View, not Dolphin, and other file managers are
+# not Dolphin either. A KIO service menu is the only way the same Add/Remove
+# reaches all of them.
+install -D -m 644 "$TW/system-tools/servicemenus/exxos-favourites.desktop" \
+        "$STAGE/usr/share/kio/servicemenus/exxos-favourites.desktop"
+
 install -D -m 644 "$TW/system-tools/61-exxos-removable-polling.rules" \
         "$STAGE/etc/udev/rules.d/61-exxos-removable-polling.rules"
 

@@ -1,0 +1,57 @@
+#!/bin/bash
+# Add or remove Exxos Favourites from outside Dolphin.
+#
+#   exxos-favourite --add FILE...
+#   exxos-favourite --remove FILE...
+#
+# Dolphin has this built in, but the desktop is Plasma's Folder View and other
+# file managers are not Dolphin at all, so the same operation has to exist as a
+# KIO service menu. This is what that menu calls.
+#
+# Favourites are symbolic links in ~/.local/share/exxos/favourites -- the whole
+# state is a directory, so this only has to make and remove links.
+set -u
+DIR="${XDG_DATA_HOME:-$HOME/.local/share}/exxos/favourites"
+mkdir -p "$DIR"
+
+notify() { command -v kdialog >/dev/null 2>&1 && kdialog --passivepopup "$1" 3 >/dev/null 2>&1 || true; }
+
+case "${1:-}" in
+--add)
+    shift; n=0
+    for f in "$@"; do
+        [ -e "$f" ] || continue
+        f=$(readlink -f -- "$f")
+        name=$(basename -- "$f")
+        link="$DIR/$name"
+        # Same rule as Dolphin's: keep the name, and only decorate it when it
+        # is taken. "name (2)" is understandable; a hashed name is not.
+        i=2
+        while [ -e "$link" ] || [ -L "$link" ]; do
+            link="$DIR/$name ($i)"; i=$((i+1))
+            [ "$i" -gt 99 ] && break
+        done
+        ln -s -- "$f" "$link" && n=$((n+1))
+    done
+    [ "$n" -gt 0 ] && notify "Added $n to Favourites"
+    ;;
+--remove)
+    shift; n=0
+    for f in "$@"; do
+        # Only ever unlink something that IS in the favourites directory, and
+        # only the link -- never what it points at.
+        #
+        # The directory of the LINK, not of its target: `readlink -m` follows
+        # the symlink through, so comparing that gave the original file's folder
+        # and nothing was ever removed.
+        [ -L "$f" ] || continue
+        d=$(cd -- "$(dirname -- "$f")" 2>/dev/null && pwd -P) || continue
+        [ "$d" = "$(cd -- "$DIR" && pwd -P)" ] || continue
+        rm -f -- "$f" && n=$((n+1))
+    done
+    [ "$n" -gt 0 ] && notify "Removed $n from Favourites"
+    ;;
+*)
+    sed -n '3,6p' "$0"; exit 1 ;;
+esac
+exit 0

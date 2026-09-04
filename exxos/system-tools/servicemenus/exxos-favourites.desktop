@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=KonqPopupMenu/Plugin
+MimeType=all/all;
+Actions=exxosFavAdd;exxosFavRemove;
+X-KDE-Submenu=Favourites
+X-KDE-Priority=TopLevel
+
+[Desktop Action exxosFavAdd]
+Name=Add to Favourites
+Icon=starred-symbolic
+Exec=exxos-favourite --add %F
+
+[Desktop Action exxosFavRemove]
+Name=Remove from Favourites
+Icon=edit-delete-remove
+Exec=exxos-favourite --remove %F

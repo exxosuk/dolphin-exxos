@@ -23,6 +23,10 @@ normal view, the way Recent Files does.
   goes stale silently.
 * A name already taken becomes "name (2)" rather than something hashed.
 
+* Also available outside Dolphin. The desktop is Plasma's Folder View and other
+  file managers are not Dolphin either, so the same two actions ship as a KIO
+  service menu, under a **Favourites** submenu, backed by `exxos-favourite`.
+
 Tabs across the top, so favourites can be grouped, are the next piece.
 
 * `install.sh --check` now reports the worker Dolphin actually loads. It only
