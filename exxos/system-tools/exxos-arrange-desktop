@@ -30,9 +30,40 @@ DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
 # --- 1. the desktop entries, if they are not there already -----------------
 DOLPHIN=$(command -v dolphin-exxos || echo /opt/exxos-dolphin/bin/dolphin)
 
+# Is this icon name actually resolvable in the selected theme?
+icon_exists() {
+    local n="$1" t
+    t=$(kreadconfig5 --file kdeglobals --group Icons --key Theme 2>/dev/null)
+    for d in "$HOME/.local/share/icons/$t" "/usr/share/icons/$t" \
+             "$HOME/.local/share/icons/hicolor" /usr/share/icons/hicolor; do
+        [ -d "$d" ] || continue
+        find "$d" \( -name "$n.svg" -o -name "$n.svgz" -o -name "$n.png" \) \
+             -print -quit 2>/dev/null | grep -q . && return 0
+    done
+    return 1
+}
+
 make_entry() {   # file, Name, Comment, Icon, Exec
     local f="$DESK/$1"
-    [ -e "$f" ] && return 0
+    if [ -e "$f" ]; then
+        # It is already there, but it may name an icon this theme does not have
+        # -- that is what a blank or black desktop icon usually is, rather than
+        # a missing file. Repair just that line and leave the rest alone.
+        local cur
+        cur=$(grep -m1 '^Icon=' "$f" 2>/dev/null | cut -d= -f2-)
+        if [ -z "$cur" ] || ! icon_exists "$cur"; then
+            if [ "$DRY" = 1 ]; then
+                echo "  would repair icon of $1 ($cur -> $4)"
+            elif grep -q '^Icon=' "$f" 2>/dev/null; then
+                sed -i "s|^Icon=.*|Icon=$4|" "$f"
+                echo "  repaired icon of $1 ($cur -> $4)"
+            else
+                printf 'Icon=%s\n' "$4" >> "$f"
+                echo "  added missing icon to $1 ($4)"
+            fi
+        fi
+        return 0
+    fi
     if [ "$DRY" = 1 ]; then echo "  would create $1"; return 0; fi
     cat > "$f" <<ENTRY
 [Desktop Entry]
@@ -59,18 +90,51 @@ if command -v plasma-discover >/dev/null 2>&1; then
 fi
 
 # --- 2. the three icons' grid cells ----------------------------------------
-python3 - "$CONF" "$DRY" <<'PY'
+EXXOS_DESKTOP_DIR="$DESK" python3 - "$CONF" "$DRY" <<'PY'
 import re, sys, subprocess
 conf, dry = sys.argv[1], sys.argv[2] == "1"
 text = open(conf).read()
 
+import os
+desk = os.environ.get("EXXOS_DESKTOP_DIR") or os.path.expanduser("~/Desktop")
 order = ["desktop:/my-computer.desktop",
          "desktop:/systemsettings.desktop",
          "desktop:/org.kde.discover.desktop"]
+# The Wastebin is an applet on some setups and a plain trash.desktop on others.
+# Where it is a file it belongs in this list; where it is an applet the second
+# pass below places it instead.
+if os.path.exists(os.path.join(desk, "trash.desktop")):
+    order.append("desktop:/trash.desktop")
 
 m = re.search(r'^positions=(\{.*\})$', text, re.M)
 if not m:
-    print("  no positions key yet -- Plasma writes one once icons are moved")
+    # Plasma only writes this once an icon has been dragged, so on a fresh
+    # desktop there is nothing to edit and the icons stay wherever the Folder
+    # View dropped them. Write one, using the screen size the containment
+    # already records, so the ordering applies from the first login.
+    res = None
+    mg = re.search(r'^ItemGeometries-(\d+x\d+)=', text, re.M)
+    if mg:
+        res = mg.group(1)
+    if not res:
+        print("  no positions key and no screen size recorded -- skipping")
+        sys.exit(0)
+    flat = ["7", "17"]
+    for i, url in enumerate(order):
+        flat += [url, str(i), "0"]
+    body = '\\,'.join('"%s"' % x for x in flat)
+    newkey = 'positions={"%s":[%s]}' % (res, body)
+    if dry:
+        print("  would create a positions key for %s" % res)
+    else:
+        # put it in the Folder View containment's General group
+        mc = re.search(r'^\[Containments\]\[\d+\]\[General\]$', text, re.M)
+        if mc:
+            text = text[:mc.end()] + "\n" + newkey + text[mc.end():]
+        else:
+            text += "\n" + newkey + "\n"
+        open(conf, "w").write(text)
+        print("  created a positions key for %s with the four icons in order" % res)
     sys.exit(0)
 
 raw = m.group(1)
