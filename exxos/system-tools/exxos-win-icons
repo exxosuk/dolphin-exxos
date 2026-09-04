@@ -74,8 +74,10 @@ MAP="
 64:media-optical-rewritable media-cdrw
 54:user-trash trash-empty user-trash-symbolic
 55:user-trash-full trash-full
-73:folder-remote network-workgroup
-74:folder-network network-server remote
+# Not mapped: network-server, network-workgroup, folder-remote, folder-network.
+# Windows draws all of these as a folder with a globe on it, so the NAS and the
+# Network shortcut became the same picture. The original theme gives them
+# distinct icons, which is more use than being authentic here.
 14:applications-games input-gaming
 15:applications-other application-x-executable applications-system
 8:system-search edit-find folder-saved-search
@@ -116,7 +118,7 @@ while IFS= read -r line; do
     [ -s "$big" ] || icotool -x -w 48 -o "$big" "$src" 2>/dev/null
     [ -s "$big" ] || continue
     case "$id" in
-        3|54|55|73|74)                 d=places ;;
+        3|54|55)                       d=places ;;
         19|2|90|21|72|83|23|22|20|77)  d=mimetypes ;;
         28|29|30|32|33|37|44|61|62|63|64|57|66|76) d=devices ;;
         14|15|88)                      d=apps ;;

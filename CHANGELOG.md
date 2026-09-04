@@ -27,6 +27,13 @@ normal view, the way Recent Files does.
   file managers are not Dolphin either, so the same two actions ship as a KIO
   service menu, under a **Favourites** submenu, backed by `exxos-favourite`.
 
+### Icons
+
+* The NAS and the Network shortcut are left to the shipped theme. Windows draws
+  both as a folder with a globe on it, so taking its versions made the two
+  indistinguishable; the theme gives them distinct icons, which is more use
+  here than being authentic.
+
 ### Favourites tabs
 
 * Fixed: the removal confirmation showed its `<filename>` markup to the user
