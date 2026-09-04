@@ -29,6 +29,10 @@ normal view, the way Recent Files does.
 
 ### Favourites tabs
 
+* Fixed: the removal confirmation showed its `<filename>` markup to the user
+  verbatim. That markup is KUIT, and only the `xi18n*` family expands it.
+
+
 A row of tabs across the top of the Favourites view -- All, plus one per group.
 A tab **is** a directory inside the favourites folder, so a tab holds shortcuts
 the way a folder holds files and there is no list, order file or index to fall

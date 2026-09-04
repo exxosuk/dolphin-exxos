@@ -787,11 +787,14 @@ void DolphinViewContainer::exxosFavouritesTabClosed(int index)
     const int count = QDir(path).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).count();
 
     /* Ask, because the shortcuts inside go with it. */
+    /* xi18nc, not i18nc: the <filename> markup is KUIT, and only the xi18n*
+       family expands it. With plain i18nc the tags are shown to the user
+       verbatim, which is what happened. */
     const QString question = count == 0
-        ? i18nc("@info", "Remove the Favourites tab <filename>%1</filename>?", name)
-        : i18ncp("@info", "Remove the Favourites tab <filename>%2</filename> and the shortcut in it?",
-                 "Remove the Favourites tab <filename>%2</filename> and the %1 shortcuts in it?",
-                 count, name);
+        ? xi18nc("@info", "Remove the Favourites tab <filename>%1</filename>?", name)
+        : xi18ncp("@info", "Remove the Favourites tab <filename>%2</filename> and the shortcut in it?",
+                  "Remove the Favourites tab <filename>%2</filename> and the %1 shortcuts in it?",
+                  count, name);
     if (KMessageBox::warningContinueCancel(
             this, question,
             i18nc("@title:window", "Remove Favourites Tab"),
@@ -833,7 +836,7 @@ void DolphinViewContainer::exxosFavouritesTabMenu(const QPoint &pos)
     }
     const QString path = exxosFavouritesRoot() + QLatin1Char('/') + name;
     if (QFileInfo::exists(path)) {
-        KMessageBox::error(this, i18nc("@info", "There is already a tab called <filename>%1</filename>.", name));
+        KMessageBox::error(this, xi18nc("@info", "There is already a tab called <filename>%1</filename>.", name));
         return;
     }
     if (QDir().mkpath(path)) {
