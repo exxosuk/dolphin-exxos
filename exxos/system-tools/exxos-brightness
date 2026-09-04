@@ -1,0 +1,66 @@
+#!/bin/bash
+# Remember the screen brightness across a reboot, and put it back at login.
+#
+#   exxos-brightness --restore   apply the saved value (run at login)
+#   exxos-brightness --watch     record it whenever it changes (run at login)
+#   exxos-brightness --save      record it once, now
+#
+# WHY THIS EXISTS
+# `xrandr --brightness` is a live gamma-ramp property on the X server. It is
+# not a setting: nothing stores it and nothing reapplies it, so every logout
+# loses it and the screen comes back at 1.0. MX Tweak's brightness systray sets
+# the same property and has the same problem.
+#
+# The previous version of this restored a brightness of 0.86 hardcoded into the
+# script, against an output named HDMI-0 also hardcoded. That works until you
+# move the brightness, or plug the monitor into a different port, at which point
+# it either silently reverts your change on every boot or silently does nothing.
+# This records what is actually set, per output, and asks the X server which
+# outputs exist rather than assuming.
+set -u
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/exxos-brightnessrc"
+
+current() {                       # -> "OUTPUT VALUE" per connected output
+    xrandr --verbose 2>/dev/null |
+        awk '/ connected/ {out=$1} /^\tBrightness:/ {if (out != "") print out, $2}'
+}
+
+save() {
+    local now
+    now=$(current)
+    [ -n "$now" ] || return 0
+    # Only touch the file when something actually changed, so this is not a
+    # write every poll for the whole session.
+    if [ ! -f "$CONF" ] || [ "$now" != "$(cat "$CONF" 2>/dev/null)" ]; then
+        printf '%s\n' "$now" > "$CONF"
+    fi
+}
+
+restore() {
+    [ -f "$CONF" ] || return 0
+    # KScreen applies the display configuration a moment after login and will
+    # overwrite the property if we get there first.
+    sleep 3
+    while read -r out value; do
+        [ -n "$out" ] && [ -n "$value" ] || continue
+        # Skip an output that is not currently connected -- a different monitor,
+        # or the same one on another port.
+        xrandr --query 2>/dev/null | grep -q "^$out connected" || continue
+        xrandr --output "$out" --brightness "$value"
+    done < "$CONF"
+}
+
+watch() {
+    # Cheap: one xrandr call every 20s, and a write only when the value moves.
+    while true; do
+        save
+        sleep 20
+    done
+}
+
+case "${1:---restore}" in
+    --restore) restore ;;
+    --save)    save ;;
+    --watch)   restore; watch ;;
+    *) sed -n '3,6p' "$0"; exit 1 ;;
+esac

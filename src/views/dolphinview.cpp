@@ -2153,7 +2153,21 @@ void DolphinView::applyViewProperties(const ViewProperties& props)
         Q_EMIT hiddenFilesShownChanged(hiddenFilesShown);
     }
 
-    const bool groupedSorting = props.groupedSorting();
+    bool groupedSorting = props.groupedSorting();
+    /* Exxos/Win7: recentlyused:/ arrives most-recently-used first and carries
+       no usage timestamp to re-derive that from, so keep the worker's order and
+       do not group -- grouping is computed from the sort role, and would scatter
+       a list that is already correct. Driven by the scheme rather than by the
+       stored view properties, because a machine that has opened Recent Files
+       before already has sortRole=modificationtime saved on disk. */
+    const bool preserveOrder = (url().scheme() == QLatin1String("recentlyused"));
+    if (preserveOrder != m_model->preserveListingOrder()) {
+        m_model->setPreserveListingOrder(preserveOrder);
+    }
+    if (preserveOrder) {
+        groupedSorting = false;
+    }
+
     if (groupedSorting != m_model->groupedSorting()) {
         m_model->setGroupedSorting(groupedSorting);
         Q_EMIT groupedSortingChanged(groupedSorting);

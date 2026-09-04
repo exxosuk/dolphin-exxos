@@ -55,6 +55,18 @@ public:
      */
     void loadDirectory(const QUrl& url);
 
+    /* Exxos/Win7: list in the order the worker sent, instead of sorting.
+
+       recentlyused:/ returns entries most-recently-used first, but its UDS
+       entries carry only the FILE's mtime -- there is no usage timestamp in
+       them at all. Sorting by modificationtime therefore throws that recency
+       away and orders by when each file last changed, so anything on a drive
+       you only ever read from sinks to the bottom for good and looks as though
+       it was never recorded. Measured: a folder on a mounted Windows partition, used at 15:31, was
+       listed under August, because August is when its directory last changed. */
+    void setPreserveListingOrder(bool preserve);
+    bool preserveListingOrder() const;
+
     /**
      * Throws away all currently loaded items and refreshes the directory
      * by reloading all items again.
@@ -498,6 +510,7 @@ private:
 
     QCollator m_collator;
     bool m_naturalSorting;
+    bool m_preserveListingOrder;
     bool m_sortDirsFirst;
     bool m_sortHiddenLast;
 

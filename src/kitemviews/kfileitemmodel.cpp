@@ -39,6 +39,7 @@ KFileItemModel::KFileItemModel(QObject* parent) :
     m_dirLister(nullptr),
     m_sortDirsFirst(true),
     m_sortHiddenLast(false),
+    m_preserveListingOrder(false),
     m_sortRole(NameRole),
     m_sortingProgressPercent(-1),
     m_roles(),
@@ -1452,10 +1453,22 @@ void KFileItemModel::insertItems(QList<ItemData*>& newItems)
     m_groups.clear();
     prepareItemsForSorting(newItems);
 
+    if (qEnvironmentVariableIsSet("EXXOS_ORDER_DEBUG")) {
+        QStringList first;
+        for (int i = 0; i < qMin(6, newItems.count()); ++i) {
+            first << newItems.at(i)->item.name();
+        }
+        qWarning("exxos-order: insertItems n=%d preserve=%d sortRole=%d natural=%d | %s",
+                 newItems.count(), int(m_preserveListingOrder), int(m_sortRole),
+                 int(m_naturalSorting), qPrintable(first.join(QLatin1String(", "))));
+    }
+
     // Natural sorting of items can be very slow. However, it becomes much faster
     // if the input sequence is already mostly sorted. Therefore, we first sort
     // 'newItems' according to the QStrings using QString::operator<(), which is quite fast.
-    if (m_naturalSorting) {
+    /* Exxos/Win7: this pre-sort runs BEFORE sort(), so skipping sort() alone is
+       not enough -- the list would still come out alphabetical. */
+    if (m_naturalSorting && !m_preserveListingOrder) {
         if (m_sortRole == NameRole) {
             parallelMergeSort(newItems.begin(), newItems.end(), nameLessThan, QThread::idealThreadCount());
         } else if (isRoleValueNatural(m_sortRole)) {
@@ -1999,8 +2012,22 @@ QHash<QByteArray, QVariant> KFileItemModel::retrieveData(const KFileItem& item, 
     return data;
 }
 
+/* Defined below, next to setPreserveListingOrder(). */
+static int exxosRecencyRank(const QString &name);
+
 bool KFileItemModel::lessThan(const ItemData* a, const ItemData* b, const QCollator& collator) const
 {
+    /* Exxos/Win7: recentlyused:/ is ordered by when you used a thing, not by
+       any property of the file. Folders-first and hidden-first would break that
+       just as thoroughly as sorting would, so this answers before them. */
+    if (m_preserveListingOrder) {
+        const int rankA = exxosRecencyRank(a->item.name());
+        const int rankB = exxosRecencyRank(b->item.name());
+        if (rankA != rankB) {
+            return (rankA < 0) ? false : (rankB < 0) ? true : rankA < rankB;
+        }
+    }
+
     int result = 0;
 
     if (a->parent != b->parent) {
@@ -2058,6 +2085,50 @@ bool KFileItemModel::lessThan(const ItemData* a, const ItemData* b, const QColla
     result = sortRoleCompare(a, b, collator);
 
     return (sortOrder() == Qt::AscendingOrder) ? result < 0 : result > 0;
+}
+
+/* Exxos/Win7: recover the recency rank the recentlyused:/ worker encoded.
+
+   The worker has to make each entry unique -- two different folders can both be
+   called "Desktop" -- so it appends "-<n>" to the name, where n counts up from
+   the most recently used. It then sets a display name without the suffix, which
+   is why the view shows a clean "Desktop".
+
+   That suffix is the only recency information anywhere in the listing: the UDS
+   entries carry the FILE's mtime and atime and nothing else, and by the time
+   items reach the model KCoreDirLister has already put them in name order, so
+   the arrival order is gone too. Measured with EXXOS_ORDER_DEBUG=1:
+
+       insertItems n=30 preserve=1 | 100NIKON_IMAGES_PICTURES-29, AI_IMAGES-20,
+                                     ATF1504-16, BOOBS-26, DGHJ-21, Desktop-1
+
+   Returns -1 when there is no suffix, which sorts such items last rather than
+   pretending they are the most recent. */
+static int exxosRecencyRank(const QString &name)
+{
+    const int dash = name.lastIndexOf(QLatin1Char('-'));
+    if (dash <= 0 || dash == name.length() - 1) {
+        return -1;
+    }
+    bool ok = false;
+    const int rank = QStringView(name).mid(dash + 1).toInt(&ok);
+    return (ok && rank >= 0) ? rank : -1;
+}
+
+void KFileItemModel::setPreserveListingOrder(bool preserve)
+{
+    if (m_preserveListingOrder == preserve) {
+        return;
+    }
+    m_preserveListingOrder = preserve;
+    if (!preserve) {
+        resortAllItems();
+    }
+}
+
+bool KFileItemModel::preserveListingOrder() const
+{
+    return m_preserveListingOrder;
 }
 
 void KFileItemModel::sort(const QList<KFileItemModel::ItemData*>::iterator &begin,
