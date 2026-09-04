@@ -67,8 +67,14 @@ for p in "${!FILES[@]}"; do
     fi
 
     # back up whatever is there now
+    #
+    # NOT next to the script. Once this ships in a package, $HERE is
+    # /usr/share/exxos/... and root-owned, so mkdir failed, the mv failed with
+    # it, and the override it claimed to have saved was then replaced anyway --
+    # the backup was silently lost and the run printed two alarming errors while
+    # still reporting success. Seen on a second machine running 1.9.10.
     if [ -d "$LOC/$p" ]; then
-        b="$HERE/superseded/$(date +%Y%m%d-%H%M%S)/$p"
+        b="${XDG_DATA_HOME:-$HOME/.local/share}/exxos/plasmoid-superseded/$(date +%Y%m%d-%H%M%S)/$p"
         mkdir -p "$(dirname "$b")"; mv "$LOC/$p" "$b"
         echo "== $p  (previous override saved to $b)"
     else

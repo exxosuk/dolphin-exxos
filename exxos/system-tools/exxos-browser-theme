@@ -1,0 +1,86 @@
+#!/bin/bash
+# Make Chromium-family browsers follow the desktop theme.
+#
+#   exxos-browser-theme            apply to every profile found
+#   exxos-browser-theme --check    report, change nothing
+#
+# WHY THIS EXISTS
+# Chrome, Brave and Chromium draw their own window frame and pick their own
+# colours unless told otherwise, so on a themed desktop they are the one thing
+# that still looks like stock. Two settings fix it, and neither is reachable
+# from any Exxos config file because they live inside the browser's own profile:
+#
+#   extensions.theme.system_theme = 1     use the system (GTK) colours
+#   browser.custom_chrome_frame   = false use the window manager's title bar,
+#                                         so the Exxos decoration applies
+#
+# The profile is rewritten, so this only runs when the browser is CLOSED --
+# a running Chromium holds Preferences in memory and writes it back on exit,
+# which would silently undo this.
+set -u
+CHECK=0; [ "${1:-}" = "--check" ] && CHECK=1
+
+profiles() {
+    for base in "$HOME/.config/google-chrome" \
+                "$HOME/.config/BraveSoftware/Brave-Browser" \
+                "$HOME/.config/chromium" \
+                "$HOME/.config/microsoft-edge"; do
+        [ -d "$base" ] || continue
+        # Default plus any "Profile 1", "Profile 2" ...
+        for p in "$base/Default" "$base"/Profile*; do
+            [ -f "$p/Preferences" ] && printf '%s\n' "$p/Preferences"
+        done
+    done
+}
+
+running() {   # is a browser using this profile currently up?
+    case "$1" in
+        *google-chrome*)  pgrep -x chrome >/dev/null 2>&1 || pgrep -f 'google-chrome' >/dev/null 2>&1 ;;
+        *Brave*)          pgrep -f 'brave' >/dev/null 2>&1 ;;
+        *chromium*)       pgrep -x chromium >/dev/null 2>&1 ;;
+        *edge*)           pgrep -f 'msedge' >/dev/null 2>&1 ;;
+        *) return 1 ;;
+    esac
+}
+
+found=0
+while IFS= read -r pf; do
+    [ -n "$pf" ] || continue
+    found=1
+    name=$(basename "$(dirname "$(dirname "$pf")")")/$(basename "$(dirname "$pf")")
+    if [ "$CHECK" = 0 ] && running "$pf"; then
+        echo "  $name: SKIPPED, the browser is running -- close it and run this again"
+        continue
+    fi
+    CHECK=$CHECK python3 - "$pf" "$name" <<'PY'
+import json, os, shutil, sys
+pf, name = sys.argv[1], sys.argv[2]
+check = os.environ.get("CHECK") == "1"
+try:
+    d = json.load(open(pf))
+except Exception as e:
+    print("  %s: could not read Preferences (%s)" % (name, e)); sys.exit(0)
+
+theme = d.setdefault("extensions", {}).setdefault("theme", {})
+cur_sys = theme.get("system_theme")
+cur_frame = d.setdefault("browser", {}).get("custom_chrome_frame")
+want = (cur_sys != 1) or (cur_frame is not False)
+
+if not want:
+    print("  %s: already following the desktop theme" % name); sys.exit(0)
+if check:
+    print("  %s: would set system_theme=1 (is %r), custom_chrome_frame=False (is %r)"
+          % (name, cur_sys, cur_frame)); sys.exit(0)
+
+shutil.copy2(pf, pf + ".exxos-before")
+theme["system_theme"] = 1
+d["browser"]["custom_chrome_frame"] = False
+json.dump(d, open(pf, "w"), separators=(",", ":"))
+print("  %s: system_theme=1, custom_chrome_frame=False  (backup: Preferences.exxos-before)" % name)
+PY
+done <<EOF
+$(profiles)
+EOF
+
+[ "$found" = 0 ] && echo "  no Chromium-family browser profiles found"
+exit 0

@@ -159,6 +159,17 @@ if command -v exxos-arrange-desktop >/dev/null 2>&1; then
     exxos-arrange-desktop | sed 's/^/  /'
 fi
 
+# --- browsers ---
+# Chromium-family browsers pick their own colours and draw their own title bar
+# unless told otherwise, so on a themed desktop they are the one thing that
+# still looks stock. Skipped for any browser that is currently running, because
+# it would write its own Preferences back over ours on exit.
+if command -v exxos-browser-theme >/dev/null 2>&1; then
+    echo
+    echo "Browsers..."
+    exxos-browser-theme | sed 's/^/  /'
+fi
+
 # --- brightness, and the tray control for it ---
 #
 # xrandr --brightness is a live gamma-ramp property on the X server, not a
