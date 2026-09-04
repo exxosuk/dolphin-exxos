@@ -22,6 +22,10 @@
 #include <KSharedConfig>
 #include <KConfigGroup>
 #include <KFileItemListProperties>
+#include <KFilePlacesModel>
+#include <KBookmarkManager>
+#include <KBookmark>
+#include <QDateTime>
 #include <KHamburgerMenu>
 #include <KIO/CopyJob>
 #include <KIO/EmptyTrashJob>
@@ -38,6 +42,7 @@
 
 #include <KMessageBox>
 #include <QPointer>
+#include <QTimer>
 #include <Solid/Device>
 #include <Solid/OpticalDrive>
 #include "exxosmediarescan.h"
@@ -46,6 +51,9 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QStandardPaths>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QKeyEvent>
 
 DolphinContextMenu::DolphinContextMenu(DolphinMainWindow* parent,
@@ -451,6 +459,7 @@ void DolphinContextMenu::addItemContextMenu()
        clashes and error reporting already handled -- which is why this does not
        call symlink() itself. */
     addSendToDesktopAction();
+    addExxosFavouritesAction();
 
     insertDefaultItemActions(selectedItemsProps);
 
@@ -468,6 +477,126 @@ void DolphinContextMenu::addItemContextMenu()
     addSeparator();
     QAction* propertiesAction = m_mainWindow->actionCollection()->action(QStringLiteral("properties"));
     addAction(propertiesAction);
+}
+
+
+/* Exxos/Win7: Favourites -- one place to reach the things you use.
+
+   Deliberately a plain directory of symbolic links, listed through an ordinary
+   Places entry, rather than a KIO worker or a synthetic model. Everything then
+   works for free: the view, sorting, drag and drop, Open With, deleting a link.
+   The only state is what is on disk, which the user can inspect, back up, or
+   fix with a file manager -- which is the point of it.
+
+   Links, never copies: a favourite that duplicates a file goes stale silently,
+   and that is worse than not having it. */
+QString exxosFavouritesDir()
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+                        + QLatin1String("/exxos/favourites");
+    QDir().mkpath(dir);
+    return dir;
+}
+
+void exxosEnsureFavouritesPlace()
+{
+    const QUrl url = QUrl::fromLocalFile(exxosFavouritesDir());
+
+    KFilePlacesModel *places = DolphinPlacesModelSingleton::instance().placesModel();
+    if (!places->match(places->index(0, 0), KFilePlacesModel::UrlRole,
+                       url, 1, Qt::MatchExactly).isEmpty()) {
+        return;
+    }
+
+    /* Written through the bookmark manager rather than KFilePlacesModel::addPlace().
+       addPlace() appends, and the entry then has to be moved -- but movePlace()
+       did not move it, immediately or deferred, and it sat at the very bottom of
+       the panel under the devices instead of under Home where it belongs. Going
+       via the manager puts it in the right place first time, because the position
+       is chosen rather than corrected. */
+    const QString file = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+                         + QLatin1String("/user-places.xbel");
+    KBookmarkManager *manager = KBookmarkManager::managerForExternalFile(file);
+    if (!manager) {
+        return;
+    }
+    KBookmarkGroup root = manager->root();
+    if (root.isNull()) {
+        return;
+    }
+
+    KBookmark added = root.addBookmark(i18nc("@item Places panel", "Favourites"),
+                                       url, QStringLiteral("starred-symbolic"));
+    added.setMetaDataItem(QStringLiteral("ID"),
+                          QString::number(QDateTime::currentSecsSinceEpoch()) + QLatin1String("/0"));
+
+    /* Directly after Home. */
+    KBookmark home;
+    for (KBookmark bm = root.first(); !bm.isNull(); bm = root.next(bm)) {
+        if (bm.url() == QUrl::fromLocalFile(QDir::homePath())) {
+            home = bm;
+            break;
+        }
+    }
+    if (!home.isNull()) {
+        root.moveBookmark(added, home);
+    }
+    manager->emitChanged(root);
+}
+
+void DolphinContextMenu::addExxosFavouritesAction()
+{
+    if (m_selectedItems.isEmpty() || m_fileInfo.url().scheme() == QLatin1String("computer")) {
+        return;
+    }
+
+    const QString favDir = exxosFavouritesDir();
+
+    /* Already in Favourites? Then the useful action is taking it out again.
+       Removing deletes the LINK and never the thing it points at. */
+    if (m_selectedItems.count() == 1 && m_fileInfo.url().isLocalFile()
+        && QFileInfo(m_fileInfo.url().toLocalFile()).absolutePath() == favDir) {
+        addAction(QIcon::fromTheme(QStringLiteral("edit-delete-remove")),
+                  i18nc("@action:inmenu", "Remove from Favourites"),
+                  [this, favDir]() {
+            for (const KFileItem &item : qAsConst(m_selectedItems)) {
+                if (!item.url().isLocalFile()) {
+                    continue;
+                }
+                const QString path = item.url().toLocalFile();
+                if (QFileInfo(path).absolutePath() == favDir) {
+                    QFile::remove(path);
+                }
+            }
+            if (m_mainWindow && m_mainWindow->activeViewContainer()) {
+                m_mainWindow->activeViewContainer()->view()->reload();
+            }
+        });
+        return;
+    }
+
+    addAction(QIcon::fromTheme(QStringLiteral("starred-symbolic")),
+              i18nc("@action:inmenu", "Add to Favourites"),
+              [this, favDir]() {
+        exxosEnsureFavouritesPlace();
+        for (const KFileItem &item : qAsConst(m_selectedItems)) {
+            const QUrl url = item.url();
+            if (!url.isLocalFile()) {
+                continue;
+            }
+            /* Keep the name it already has, and only decorate it when that name
+               is taken -- "file (2)" is understandable, a hashed name is not. */
+            const QString name = item.name();
+            QString link = favDir + QLatin1Char('/') + name;
+            for (int n = 2; QFileInfo::exists(link) || QFileInfo(link).isSymLink(); ++n) {
+                link = QStringLiteral("%1/%2 (%3)").arg(favDir, name, QString::number(n));
+                if (n > 99) {
+                    return;
+                }
+            }
+            QFile::link(url.toLocalFile(), link);
+        }
+    });
 }
 
 void DolphinContextMenu::addSendToDesktopAction()

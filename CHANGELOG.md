@@ -8,6 +8,23 @@ minor number with each push to the repository. `exxos-desktop` and
 
 ## Unreleased
 
+### Favourites
+
+A **Favourites** entry in the Places panel, directly under Home with a yellow
+star, holding shortcuts to anything worth keeping to hand. It opens in the
+normal view, the way Recent Files does.
+
+* **Add to Favourites** and **Remove from Favourites** in the context menu of
+  any file or folder -- an ordinary listing, the desktop, or search results.
+  Removing deletes the shortcut and never the thing it points at.
+* Shortcuts are symbolic links in `~/.local/share/exxos/favourites`, so the
+  whole state is a directory the user can inspect, back up or repair with a
+  file manager. Links rather than copies: a favourite that duplicates a file
+  goes stale silently.
+* A name already taken becomes "name (2)" rather than something hashed.
+
+Tabs across the top, so favourites can be grouped, are the next piece.
+
 * `install.sh --check` now reports the worker Dolphin actually loads. It only
   ever compared the root-owned copy under `/usr/lib`, which this build does not
   load once a copy exists in `~/.local` -- so it said STALE while the loaded

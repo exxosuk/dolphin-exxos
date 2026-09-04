@@ -25,6 +25,11 @@ class DolphinRemoveAction;
    a drive becomes accessible again by ANY route. */
 void exxosSetUnmountedByUser(const QString &udi, bool unmounted);
 
+/* Exxos/Win7: the Favourites directory, and the Places entry that shows it.
+   Defined in dolphincontextmenu.cpp. */
+QString exxosFavouritesDir();
+void exxosEnsureFavouritesPlace();
+
 /**
  * @brief Represents the context menu which appears when doing a right
  *        click on an item or the viewport of the file manager.
@@ -78,6 +83,9 @@ private:
 
     /* Exxos/Win7: the "Send to Desktop (create shortcut)" entry. */
     void addSendToDesktopAction();
+
+    /* Exxos/Win7: "Add to Favourites" / "Remove from Favourites". */
+    void addExxosFavouritesAction();
     void addViewportContextMenu();
 
     void insertDefaultItemActions(const KFileItemListProperties&);
