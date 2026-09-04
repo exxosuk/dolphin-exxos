@@ -1,0 +1,18 @@
+--- a/contents/config/main.xml
++++ b/contents/config/main.xml
+@@ -8,6 +8,15 @@
+   <group name="General">
+     <entry name="url" type="String">
+     </entry>
++    <!-- Exxos: width of the applet's slot on the panel, and the gap either
++         side of it. Upstream has no setting for either, so quick-launch icons
++         could only be resized by editing QML. -->
++    <entry name="exxosSlotWidth" type="Int">
++      <default>38</default>
++    </entry>
++    <entry name="exxosSpacing" type="Int">
++      <default>0</default>
++    </entry>
+     <entry name="localPath" type="String">
+     </entry>
+   </group>

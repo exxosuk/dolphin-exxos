@@ -551,7 +551,7 @@ QList<QByteArray> DolphinView::visibleRoles() const
    Solid's deviceAdded fires when the block device appears, which is BEFORE
    udisks has finished probing the medium -- at that instant there is still no
    volume and no label, so reloading immediately re-read the old answer ("No
-   disc") and nothing ever reloaded again. Inserting a disc showed GAMES3 in
+   disc") and nothing ever reloaded again. Inserting a disc showed DATA in
    the Places panel, which listens to Solid directly, while the icon view sat
    unchanged until Dolphin was restarted.
 
@@ -562,8 +562,8 @@ QList<QByteArray> DolphinView::visibleRoles() const
    deviceAdded is NOT enough. Inserting a disc adds the block device, and the
    MOUNT happens seconds later -- auto-mount, or the user clicking it -- and
    that emits StorageAccess::accessibilityChanged, not a device signal. Without
-   this the view still read "GAMES3 - not mounted" long after it had actually
-   been mounted at /media/chris/GAMES3.
+   this the view still read "DATA - not mounted" long after it had actually
+   been mounted at /media/user/DATA.
 
    Passing an empty udi connects everything currently present; passing one
    connects just that device, for volumes that appear later.

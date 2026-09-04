@@ -1,5 +1,5 @@
---- /usr/share/plasma/plasmoids/org.kde.plasma.kicker/contents/ui/ItemListView.qml	2023-05-09 12:37:55.000000000 +0100
-+++ /home/exxos/claude/audit/theme-audit/plasmoids/plasmoids/org.kde.plasma.kicker/contents/ui/ItemListView.qml	2026-09-01 20:21:45.000000000 +0100
+--- a/contents/ui/ItemListView.qml
++++ b/contents/ui/ItemListView.qml
 @@ -13,6 +13,27 @@
  FocusScope {
      id: itemList

@@ -8,6 +8,59 @@ minor number with each push to the repository. `exxos-desktop` and
 
 ## Unreleased
 
+### Dolphin Exxos Edition 1.9.0 — the unmount work, and the plasmoid patches made to apply
+
+The PC and the laptop had drifted apart: the PC carried 1.8.10 to 1.8.13, none of
+which had ever been pushed, while the laptop had pushed theme work the PC had
+never seen. Merged, with the PC's code as the base and the laptop's changes
+reapplied on top, so neither side lost anything.
+
+**Unmount, from the PC (1.8.10 - 1.8.13).** Unmount appeared to do nothing. The
+guard that makes it stick lived in a worker Dolphin was not loading: only the
+`dolphin-exxos` wrapper set `QT_PLUGIN_PATH`, so launching Dolphin any other way
+silently loaded the stale root-owned worker under `/usr/lib`. `main.cpp` now
+prepends `~/.local/lib/qt5/plugins` to the library paths itself, so the launcher
+cannot be bypassed. With that fixed:
+
+* A fourth device state, `locked`, separates "not mounted, will mount when you
+  open it" from "you unmounted this, and it will refuse to open". Only `locked`
+  draws the padlock.
+* The record is written only when `teardownDone` reports success, cleared when a
+  drive becomes accessible by ANY route, and cleared when the medium is removed.
+* `teardown()` returning false is handled. The udisks2 backend answers false and
+  emits nothing when a setup or teardown is already running -- the one path that
+  gives exactly "spinner forever, no message".
+* The redundant `emblem-unmounted` red star is gone; the padlock already says it.
+* State flags moved out of the `m_pixmap.isNull()` guard, so a recycled list
+  widget cannot keep another drive's state.
+
+**The plasmoid patches could never apply.** All five carried absolute paths in
+their headers (`--- /usr/share/...`, `+++ /home/.../audit/...`), so
+`rebuild-overrides.sh`, which uses `-p1`, could not find a single file to patch.
+Every run reported WOULD FAIL and a real rebuild would have left every widget
+stock. Headers are now relative `a/` and `b/` paths; all five apply cleanly on
+plasmashell 5.27.5, and the rebuilt overrides are byte-identical to the working
+PC's.
+
+**Patching a file that was already patched.** Where `kicker-system-patch/apply.sh`
+has been run, `/usr/share` carries an Exxos edit and keeps the original beside it
+as `.exxos-orig`. Copying that and patching it applied the same change twice --
+two Rectangles with `id: win7ListBackdrop`, a duplicate-id error, and a start menu
+that would not open. `rebuild-overrides.sh` now reverts any `.exxos-orig` before
+patching, so it gives the same result whether or not the system patch is
+installed.
+
+**The icon applet lost its settings on rebuild.** `contents/config/main.xml`
+declares `exxosSlotWidth` and `exxosSpacing`, and no patch covered it -- so a
+rebuild produced QML referring to configuration keys that no longer existed, and
+quick-launch spacing reverted. Added as a patch and registered in the file list.
+
+**Smaller things.** `rebuild-overrides.sh` suggested restarting with `kquitapp5`,
+which is not installed on MX 23; it now names `kstart5 plasmashell --replace`.
+The personal-data scrub missed `dolphinview.cpp`, `dolphinmainwindow.cpp`,
+`computer.cpp` and the patch headers -- real drive labels and home paths in
+comments, now generic.
+
 ### exxos-theme-apply — fixed, was broken on a clean install
 
 `exxos-theme-apply` only set 4 of the 12 config keys the theme needs. On the

@@ -20,6 +20,11 @@ class KFileItemActions;
 class KFileItemListProperties;
 class DolphinRemoveAction;
 
+/* Exxos/Win7: record, or clear, a drive the user deliberately unmounted.
+   Defined in dolphincontextmenu.cpp; DolphinMainWindow clears the record when
+   a drive becomes accessible again by ANY route. */
+void exxosSetUnmountedByUser(const QString &udi, bool unmounted);
+
 /**
  * @brief Represents the context menu which appears when doing a right
  *        click on an item or the viewport of the file manager.

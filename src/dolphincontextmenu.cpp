@@ -35,6 +35,8 @@
 
 #include <KIO/UDSEntry>
 
+#include <KMessageBox>
+#include <QPointer>
 #include <Solid/Device>
 #include <Solid/OpticalDrive>
 #include "exxosmediarescan.h"
@@ -256,7 +258,7 @@ bool DolphinContextMenu::addComputerDeviceActions()
 
     bool added = false;
 
-    if (state == QLatin1String("unmounted")) {
+    if (state == QLatin1String("unmounted") || state == QLatin1String("locked")) {
         addAction(QIcon::fromTheme(QStringLiteral("media-mount")),
                   i18nc("@action:inmenu", "Mount"), [udi]() {
             /* Spin the drive while it happens. Mounting a slow disk takes a
@@ -273,17 +275,73 @@ bool DolphinContextMenu::addComputerDeviceActions()
         added = true;
     } else if (state == QLatin1String("mounted")) {
         addAction(QIcon::fromTheme(QStringLiteral("media-eject")),
-                  i18nc("@action:inmenu", "Unmount"), [udi]() {
+                  i18nc("@action:inmenu", "Unmount"), [this, udi]() {
             ExxosBusySpinner::instance()->setDriveBusy(udi, true);
             Solid::Device dev(udi);
-            if (auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>())) {
-                access->teardown();
+            auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>());
+            const bool dbg = qEnvironmentVariableIsSet("EXXOS_MOUNT_DEBUG");
+            if (dbg) {
+                qWarning("exxos-unmount: udi=%s valid=%d access=%p accessible=%d",
+                         qPrintable(udi), int(dev.isValid()), (void *)access,
+                         access ? int(access->isAccessible()) : -1);
             }
-            /* Remember it. Unmounting has to mean something: without this the
-               drive is mounted again by the next click on it, or by the
-               auto-mount sweep six seconds later, and the user is left
-               wondering what unmount was for. */
-            exxosSetUnmountedByUser(udi, true);
+            if (!access) {
+                ExxosBusySpinner::instance()->setDriveBusy(udi, false);
+                return;
+            }
+
+            /* Wait for the RESULT before recording anything. The record is
+               what makes unmounting mean something -- without it the drive is
+               mounted again by the next click on it, or by the auto-mount
+               sweep six seconds later. But writing it straight after
+               teardown() recorded the intention rather than the outcome: a
+               drive that is busy, or one the user has no permission to
+               unmount, stayed mounted and was marked unmounted anyway, so the
+               padlock appeared over a drive that was still fully open. Found
+               that way on this machine 2026-09-03. */
+            QPointer<QWidget> parent(m_mainWindow);
+            QPointer<DolphinMainWindow> window(m_mainWindow);
+            auto *ctx = new QObject();
+            connect(access, &Solid::StorageAccess::teardownDone, ctx,
+                    [ctx, udi, parent, window](Solid::ErrorType error, const QVariant &message, const QString &) {
+                ExxosBusySpinner::instance()->setDriveBusy(udi, false);
+                if (error == Solid::NoError) {
+                    exxosSetUnmountedByUser(udi, true);
+                    /* Re-list AFTER the record exists. The view is already
+                       being reloaded by accessibilityChanged, which fires as
+                       soon as the volume goes away -- before this reply
+                       arrives -- so that listing sees the drive as merely
+                       "unmounted" and the padlock never appears. Measured
+                       2026-09-03: the tile said "not mounted" with no padlock
+                       while dolphinrc already held the drive. */
+                    if (window && window->activeViewContainer()) {
+                        window->activeViewContainer()->view()->reload();
+                    }
+                } else {
+                    /* Say so. A drive that refuses to unmount because
+                       something still has a file open on it is the ordinary
+                       case, and silence there looks like the menu entry does
+                       nothing at all. */
+                    const QString text = message.toString();
+                    KMessageBox::error(parent,
+                        text.isEmpty()
+                            ? i18nc("@info", "The drive could not be unmounted.")
+                            : i18nc("@info", "The drive could not be unmounted: %1", text));
+                }
+                ctx->deleteLater();
+            });
+            const bool started = access->teardown();
+            if (dbg) {
+                qWarning("exxos-unmount: teardown() returned %d", int(started));
+            }
+            /* teardown() answering false means it never even asked, so no
+               teardownDone is coming and the spinner would turn for ever. */
+            if (!started) {
+                ExxosBusySpinner::instance()->setDriveBusy(udi, false);
+                ctx->deleteLater();
+                KMessageBox::error(parent,
+                    i18nc("@info", "The drive could not be unmounted."));
+            }
         });
         added = true;
     }

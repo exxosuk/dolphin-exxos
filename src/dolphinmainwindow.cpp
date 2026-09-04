@@ -302,6 +302,13 @@ DolphinMainWindow::DolphinMainWindow() :
 
     connect(Solid::DeviceNotifier::instance(), &Solid::DeviceNotifier::deviceRemoved,
             this, [this](const QString &udi) {
+        /* Taking the medium out forgets a deliberate unmount, which is what
+           anyone would expect: unmounting THIS floppy says nothing about the
+           next one, and a padlock left on a drive because of a disk that is no
+           longer in it refuses to open a disk that would mount perfectly well.
+           Same for a stick that is pulled and plugged back in. */
+        exxosSetUnmountedByUser(udi, false);
+
         /* Resolve BEFORE the device is gone, while Solid can still say which
            drive it sat in -- afterwards the parent chain is unavailable. */
         ExxosBusySpinner::instance()->setDriveBusy(udi, true);
@@ -1793,7 +1800,17 @@ void DolphinMainWindow::exxosWatchAccessibility()
 
 void DolphinMainWindow::exxosAccessibilityChanged(bool accessible, const QString &udi)
 {
-    Q_UNUSED(accessible)
+    /* A drive that is mounted again is no longer a drive the user unmounted,
+       whichever route mounted it -- the places panel, another application,
+       udisksctl, or taking the medium out and putting it back. The record was
+       only ever cleared by our own Mount entry, so any of those left a lie
+       behind in dolphinrc: this machine had SYSTEM recorded as unmounted while
+       it sat mounted on /media/user/SYSTEM (2026-09-03). The next unmount then
+       looked permanent, because the stale record was already there. */
+    if (accessible) {
+        exxosSetUnmountedByUser(udi, false);
+    }
+
     /* The drive has finished mounting or unmounting: stop its spinner and
        re-list, so the tile, its capacity bar and the Mount/Unmount entry all
        describe what is true now. */

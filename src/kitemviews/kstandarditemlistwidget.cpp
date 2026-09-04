@@ -305,6 +305,7 @@ KStandardItemListWidget::KStandardItemListWidget(KItemListWidgetInformant* infor
     m_additionalInfoTextColor(),
     m_overlay(),
     m_exxosUnavailable(false),
+    m_exxosLocked(false),
     m_rating(),
     m_roleEditor(nullptr),
     m_oldRoleEditor(nullptr)
@@ -489,11 +490,12 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
         }
     } else if (!m_pixmap.isNull()) {
         if (m_exxosUnavailable) {
-            /* Exxos/Win7: an unmounted drive is drawn as unavailable - the
-               icon greyed and faded, with a padlock over it. The text says
-               "not mounted" as well, but that is the first thing elided on a
-               narrow tile, and a drive you cannot open should not look
-               identical to one you can. */
+            /* Exxos/Win7: a drive that is not mounted is drawn as unavailable
+               - the icon greyed and faded. The text says "not mounted" as
+               well, but that is the first thing elided on a narrow tile, and a
+               drive you cannot read should not look identical to one you can.
+               The padlock is added only when the user unmounted it on purpose
+               (see m_exxosLocked). */
             QImage grey = m_pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
             for (int y = 0; y < grey.height(); ++y) {
                 auto *line = reinterpret_cast<QRgb *>(grey.scanLine(y));
@@ -509,8 +511,10 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
             drawPixmap(painter, faded);
             painter->setOpacity(was);
 
-            const QPixmap lock = QIcon::fromTheme(QStringLiteral("object-locked"))
-                                     .pixmap(qRound(m_scaledPixmapSize.width() * 0.45));
+            const QPixmap lock = m_exxosLocked
+                ? QIcon::fromTheme(QStringLiteral("object-locked"))
+                      .pixmap(qRound(m_scaledPixmapSize.width() * 0.45))
+                : QPixmap();
             if (!lock.isNull()) {
                 painter->drawPixmap(QPointF(m_pixmapPos.x(),
                                             m_pixmapPos.y() + m_scaledPixmapSize.height()
@@ -1192,6 +1196,23 @@ void KStandardItemListWidget::updatePixmapCache()
             m_pixmap = values["iconPixmap"].value<QPixmap>();
         }
 
+        /* Exxos/Win7: how a drive is drawn follows the ROLE, not the pixmap.
+           These used to be set inside the "no pixmap yet" branch below, so a
+           recycled widget -- which is what a re-listing mostly produces --
+           kept whatever it decided the first time. A drive that was mounted
+           after being listed stayed greyed, and one that became locked never
+           gained its padlock. Caught 2026-09-03 with the state confirmed
+           "locked" in the worker and no padlock on screen.
+
+           Both states grey the icon: neither drive can be read as it stands.
+           Only a drive the user unmounted deliberately gets the padlock -- an
+           "unmounted" one mounts itself when opened, and a padlock over
+           something that opens on the next click is a lie. */
+        const QString exxosState = values.value("deviceState").toString();
+        m_exxosUnavailable = (exxosState == QLatin1String("unmounted")
+                              || exxosState == QLatin1String("locked"));
+        m_exxosLocked = (exxosState == QLatin1String("locked"));
+
         if (m_pixmap.isNull()) {
             // Use the icon that fits to the MIME-type
             QString iconName = values["iconName"].toString();
@@ -1200,7 +1221,6 @@ void KStandardItemListWidget::updatePixmapCache()
                 // use a generic icon as fallback
                 iconName = QStringLiteral("unknown");
             }
-            m_exxosUnavailable = values.value("deviceState").toString() == QLatin1String("unmounted");
             const QStringList overlays = values["iconOverlays"].toStringList();
             m_pixmap = pixmapForIcon(iconName, overlays, maxIconHeight, m_layout != IconsLayout && isActiveWindow() && isSelected() ? QIcon::Selected : QIcon::Normal);
 

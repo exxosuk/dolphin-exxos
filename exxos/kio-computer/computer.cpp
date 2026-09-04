@@ -155,14 +155,14 @@ void appendNetworkMounts(QVector<Drive> *out)
    date by udisks D-Bus signals. A KIO worker is a short-lived process that
    spends its life blocked in dispatchLoop, so those signals are not
    necessarily processed before we answer: after auto-mounting a disc the view
-   still read "GAMES3 - not mounted" while the kernel had it mounted at
-   /media/chris/GAMES3, and re-listing did not help because the worker kept
+   still read "DATA - not mounted" while the kernel had it mounted at
+   /media/user/DATA, and re-listing did not help because the worker kept
    giving the same stale answer.
 
    /proc/self/mounts cannot be stale -- it is the kernel's own table. */
 static QHash<QString, QString> currentMounts()
 {
-    QHash<QString, QString> byDevice;      // /dev/sr0 -> /media/chris/GAMES3
+    QHash<QString, QString> byDevice;      // /dev/sr0 -> /media/user/DATA
     QFile f(QStringLiteral("/proc/self/mounts"));
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
         return byDevice;
@@ -186,7 +186,7 @@ static QHash<QString, QString> currentMounts()
    partition on a disk, but an optical disc is its own device under the drive,
    and with a disc inserted the immediate parent was not a drive -- so coverage
    was never recorded and the CD appeared TWICE: once as its volume label
-   ("GAMES3") and again as the empty bay ("CD-RW Drive - not mounted"). Walk up
+   ("DATA") and again as the empty bay ("CD-RW Drive - not mounted"). Walk up
    until a StorageDrive is found. */
 static QString ancestorDriveUdi(const Solid::Device &volume)
 {
@@ -619,6 +619,12 @@ KIO::UDSEntry networkShortcut(int networkCount = -1)
      media-floppy, drive-optical, media-flash, drive-removable-media-usb,
      drive-harddisk  -> /usr/share/icons/breeze/devices/
    No Windows artwork is needed for any of these. */
+/* Defined below, next to the config parsing it belongs with. driveEntry()
+   needs it to tell a drive that is merely not mounted from one the user
+   deliberately unmounted -- they look the same to Solid and must not look the
+   same on screen. */
+static bool userUnmounted(const QString &udi);
+
 QString iconFor(const Drive &d)
 {
     if (d.network)   return QStringLiteral("folder-network");
@@ -839,9 +845,17 @@ KIO::UDSEntry ComputerProtocol::driveEntry(const Drive &d, int categoryCount)
        -- real UDIs contain underscores ("block_devices") -- so the UDI is
        carried verbatim instead of being reconstructed. */
     e.fastInsert(KIO::UDSEntry::UDS_EXTRA + 2, d.udi);
+    /* Four states, not three. "unmounted" and "locked" are both "not mounted
+       right now", but they behave in opposite ways and so must not look alike:
+       an unmounted drive mounts when it is opened, the way Windows does, while
+       a locked one is a drive the user unmounted on purpose and refuses to
+       open until it is mounted again. Drawing the padlock over both was
+       measured 2026-09-03 as actively misleading -- a floppy showed the
+       padlock, a disk was put in, and it opened. */
     e.fastInsert(KIO::UDSEntry::UDS_EXTRA + 3,
                  d.mounted  ? QStringLiteral("mounted")
                  : d.noMedium ? QStringLiteral("nomedium")
+                 : userUnmounted(d.udi) ? QStringLiteral("locked")
                               : QStringLiteral("unmounted"));
     e.fastInsert(KIO::UDSEntry::UDS_EXTRA + 4,
                  d.optical ? QStringLiteral("optical")
@@ -881,15 +895,13 @@ KIO::UDSEntry ComputerProtocol::driveEntry(const Drive &d, int categoryCount)
         e.fastInsert(KIO::UDSEntry::UDS_SIZE, static_cast<long long>(d.size));
     }
 
-    /* A drive that could be mounted and is not gets a marker on its icon, so
-       "not mounted" is visible at a glance rather than only in the text under
-       it. Explorer has nothing equivalent because Windows mounts everything;
-       here it is the difference between a drive you can open and one you
-       cannot. */
-    if (d.mountPath.isEmpty() && !d.noMedium && !d.network && d.size > 0) {
-        e.fastInsert(KIO::UDSEntry::UDS_ICON_OVERLAY_NAMES,
-                     QStringLiteral("emblem-unmounted"));
-    }
+    /* No UDS_ICON_OVERLAY_NAMES here. This used to set "emblem-unmounted" to
+       mark a drive that is not mounted -- a red star in this icon theme, drawn
+       in the corner. The tile already draws that state far more legibly, by
+       greying the icon and (when locked) putting a padlock on it, so the star
+       was a second, smaller badge saying the same thing. It also only ever
+       appeared when the drive reported a size, so an unmounted FLOPPY never
+       got one and the two markers disagreed. Removed 2026-09-03. */
 
     return e;
 }
@@ -1055,8 +1067,11 @@ void ComputerProtocol::listDir(const QUrl &url)
                deliberate unmounts in dolphinrc; Mount from the context menu
                clears the entry. */
             if (path.isEmpty() && userUnmounted(d.udi)) {
+                /* No full stop: KIO renders ERR_ACCESS_DENIED as
+                   "Access denied to <text>." and adds its own, so a trailing
+                   one here came out as "open it..". */
                 error(KIO::ERR_ACCESS_DENIED,
-                      i18n("%1 is not mounted. Right-click it and choose Mount to open it.",
+                      i18n("%1 is not mounted. Right-click it and choose Mount to open it",
                            d.label.isEmpty() ? d.description : d.label));
                 return;
             }

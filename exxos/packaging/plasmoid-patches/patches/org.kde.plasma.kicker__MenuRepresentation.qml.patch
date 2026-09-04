@@ -1,5 +1,5 @@
---- /usr/share/plasma/plasmoids/org.kde.plasma.kicker/contents/ui/MenuRepresentation.qml	2023-05-09 12:37:55.000000000 +0100
-+++ /home/exxos/claude/audit/theme-audit/plasmoids/plasmoids/org.kde.plasma.kicker/contents/ui/MenuRepresentation.qml	2026-09-01 21:44:18.000000000 +0100
+--- a/contents/ui/MenuRepresentation.qml
++++ b/contents/ui/MenuRepresentation.qml
 @@ -42,6 +42,24 @@
          searchField.focus = true;
      }

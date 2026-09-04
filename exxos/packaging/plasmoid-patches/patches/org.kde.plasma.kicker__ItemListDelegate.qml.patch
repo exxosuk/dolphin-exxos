@@ -1,5 +1,5 @@
---- /usr/share/plasma/plasmoids/org.kde.plasma.kicker/contents/ui/ItemListDelegate.qml	2023-05-09 12:37:55.000000000 +0100
-+++ /home/exxos/claude/audit/theme-audit/plasmoids/plasmoids/org.kde.plasma.kicker/contents/ui/ItemListDelegate.qml	2026-09-01 20:02:46.000000000 +0100
+--- a/contents/ui/ItemListDelegate.qml
++++ b/contents/ui/ItemListDelegate.qml
 @@ -7,6 +7,7 @@
  import QtQuick 2.15
  

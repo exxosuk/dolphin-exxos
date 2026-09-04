@@ -45,6 +45,7 @@
 #endif
 
 #include <QApplication>
+#include <QDir>
 #include <QCommandLineParser>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
@@ -147,6 +148,43 @@ int main(int argc, char **argv)
 #endif
     QApplication app(argc, argv);
     app.setWindowIcon(QIcon::fromTheme(QStringLiteral("system-file-manager"), app.windowIcon()));
+
+    /* Exxos Edition: find OUR computer:/ worker, whoever started us.
+
+       KIO resolves a worker's .so through the Qt plugin path of the process
+       that spawns it, and dolphin-exxos set QT_PLUGIN_PATH to do that. But the
+       variable is only set when the wrapper is the thing that runs -- start
+       build/bin/dolphin directly, as any test run or session restore does, and
+       KIO silently falls back to the root-owned copy under /usr/lib. That copy
+       is only refreshed by a root install, so it is routinely months old, and
+       the failure is invisible: the build under test looks like it is running
+       while its worker is not.
+
+       Measured 2026-09-03: Unmount appeared to do nothing because of exactly
+       this. Dolphin recorded the drive as unmounted and drew the padlock, and
+       a worker predating the change mounted it again the moment it was opened.
+
+       Setting it here instead means it cannot be bypassed. The environment
+       variable is set too, so a worker that spawns another agrees with us.
+       Only the running user's own path is added, and only if it exists, so a
+       packaged install -- where the worker IS the one under /usr/lib -- is
+       unaffected. */
+    {
+        const QString ourPlugins = QDir::homePath() + QLatin1String("/.local/lib/qt5/plugins");
+        if (QDir(ourPlugins).exists()) {
+            QStringList paths = QCoreApplication::libraryPaths();
+            paths.removeAll(ourPlugins);
+            paths.prepend(ourPlugins);          // searched FIRST, not merely present
+            QCoreApplication::setLibraryPaths(paths);
+
+            const QByteArray existing = qgetenv("QT_PLUGIN_PATH");
+            if (!existing.split(':').contains(ourPlugins.toLocal8Bit())) {
+                qputenv("QT_PLUGIN_PATH",
+                        existing.isEmpty() ? ourPlugins.toLocal8Bit()
+                                           : ourPlugins.toLocal8Bit() + ':' + existing);
+            }
+        }
+    }
 
     KIO::PreviewJob::setDefaultDevicePixelRatio(app.devicePixelRatio());
 

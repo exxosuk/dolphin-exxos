@@ -1,5 +1,5 @@
---- /usr/share/plasma/plasmoids/org.kde.plasma.taskmanager/contents/ui/code/layout.js	2023-05-09 12:37:56.000000000 +0100
-+++ /home/exxos/claude/audit/theme-audit/plasmoids/plasmoids/org.kde.plasma.taskmanager/contents/ui/code/layout.js	2026-09-01 16:45:15.000000000 +0100
+--- a/contents/ui/code/layout.js
++++ b/contents/ui/code/layout.js
 @@ -103,6 +103,39 @@
  function preferredMinWidth() {
      var width = launcherWidth();

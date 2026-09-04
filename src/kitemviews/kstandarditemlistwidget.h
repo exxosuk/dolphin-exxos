@@ -332,6 +332,7 @@ private:
 
     QPixmap m_overlay;
     bool m_exxosUnavailable;   // drive present but not mounted
+    bool m_exxosLocked;        // ...and the user unmounted it deliberately
     QPixmap m_rating;
 
     KItemListRoleEditor* m_roleEditor;

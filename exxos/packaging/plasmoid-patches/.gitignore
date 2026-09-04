@@ -1,0 +1,3 @@
+# rebuild-overrides.sh saves the previous override here before replacing it.
+# Those are copies of the local desktop, not source. Never commit them.
+superseded/

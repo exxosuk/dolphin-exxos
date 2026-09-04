@@ -1,5 +1,5 @@
---- /usr/share/plasma/plasmoids/org.kde.plasma.icon/contents/ui/main.qml	2023-05-09 12:38:49.000000000 +0100
-+++ /home/exxos/claude/audit/theme-audit/plasmoids/plasmoids/org.kde.plasma.icon/contents/ui/main.qml	2026-09-01 22:44:38.000000000 +0100
+--- a/contents/ui/main.qml
++++ b/contents/ui/main.qml
 @@ -43,10 +43,34 @@
      Accessible.description: toolTip.subText
      Accessible.role: Accessible.Button

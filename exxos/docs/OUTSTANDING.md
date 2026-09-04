@@ -27,6 +27,9 @@ If a fix ever appears absent again, check the window title says
 | 2 | **Card-reader slots under Removable Devices** | Same blocker as #1. |
 | 3 | **All device retesting from 2026-09-02 evening** | Invalid. `install.sh --check` proved the installed worker was the 00:19 build all along, so `refreshSolid()` has never run here. Retest after installing. |
 | 4 | **NAS / Network empty** | FIXED IN DOLPHIN. `ExxosNetworkDiscovery` keeps the sender address from the WS-Discovery reply instead of resolving the advertised name, so this works on any machine with no setup. `network-tools/fix-nas-name.sh` is now optional. The NAS refuses anonymous listing, so Dolphin asks for credentials once -- correct behaviour, not a fault. |
+| 5 | **`install.sh --check` checks the wrong worker** | It compares the root-owned copy under `/usr/lib`, which this build no longer loads. It reported STALE while the loaded worker was current, and would report OK while a stale one was in use. Should check what Dolphin resolves. |
+| 6 | **A stale `UnmountedByUser` record is never revalidated** | The record is only cleared by a running Dolphin seeing `accessibilityChanged`. Mount a drive while Dolphin is closed and it stays listed. Harmless today because the worker checks `mounted` before `locked`, so the view is still right — but the record lies. Validate it on startup. |
+| 7 | **`org.kde.plasma.showdesktop` override is unmanaged** | The PC carries one, `rebuild-overrides.sh` does not know about it, and it is a full copy of older Plasma QML — the exact silent-shadow failure the patch system exists to prevent. Decide whether it is needed; if not, delete it. |
 
 ## Fixed 2026-09-02 (evening) -- needs a run-through on the real hardware
 
@@ -36,7 +39,7 @@ All four were the SAME root cause or were verified in the act; see
 | Item | What was wrong | Verified how |
 |---|---|---|
 | Icon view never updated (disc, floppy, eject, labels) | The pooled KIO worker never dispatches Qt events, so Solid's device cache was frozen from the moment that worker started. Reloading could not help; restarting Dolphin got a new worker, which is why that "worked". | `kio-computer/solid-stale-test.cpp`: a loop device attached and detached mid-run was invisible without `processEvents()` and appeared/vanished within one cycle with it. |
-| No way to mount without opening, and no way to unmount | Auto-mount is off by default by design, and nothing else offered the operation. | Mount / Unmount / Eject added to the device context menu in `computer:/`. Not yet exercised on real media. |
+| No way to mount without opening, and no way to unmount | Auto-mount is off by default by design, and nothing else offered the operation. | Mount / Unmount / Eject added to the device context menu in `computer:/`. **Unmount then appeared to do nothing — fixed 2026-09-03, see `THEME-LOG.md`: the guard that makes it stick was in a worker Dolphin was not loading.** |
 | Auto-mount option not findable | It was under View. | Moved to Settings, and added to the `computer:/` background context menu. |
 | Zoom "grow" animation skipped at some steps | The second layout pass of a zoom stops every animation when the grid gains or loses a column, icon resize included. | Caught in the act with `EXXOS_ZOOM_DEBUG=1`: `icon 41 -> 32 animate=0` -- an animation cut off mid-flight. |
 
