@@ -1297,6 +1297,15 @@ void KStandardItemListWidget::updatePixmapCache()
     m_scaledPixmapSize.scale(maxScaledIconWidth * qApp->devicePixelRatio(), maxScaledIconHeight * qApp->devicePixelRatio(), Qt::KeepAspectRatio);
     m_scaledPixmapSize = m_scaledPixmapSize / qApp->devicePixelRatio();
 
+    if (qEnvironmentVariableIsSet("EXXOS_ICON_DEBUG")) {
+        qWarning("exxos-icon: %-28s tile=%d widgetSize=%.0fx%.0f iconSize=%d "
+                 "scaledIconSize=%d pixmap=%dx%d scaled=%dx%d",
+                 qPrintable(data().value("text").toString().left(28)),
+                 int(m_isTile), widgetSize.width(), widgetSize.height(),
+                 widgetIconSize, scaledIconSize, m_pixmap.width(), m_pixmap.height(),
+                 int(m_scaledPixmapSize.width()), int(m_scaledPixmapSize.height()));
+    }
+
     if (iconOnTop) {
         // Center horizontally and align on bottom within the icon-area
         m_pixmapPos.setX((widgetSize.width() - m_scaledPixmapSize.width()) / 2.0);

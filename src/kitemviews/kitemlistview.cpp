@@ -810,6 +810,29 @@ void KItemListView::setItemSize(const QSizeF& size)
     m_sizeHintResolver->clearCache();
     doLayout(animate ? Animation : NoAnimation);
     onItemSizeChanged(size, previousSize);
+
+    /* Exxos/Win7: repaint everything when the zoom changes.
+
+       The view invalidates the rect each widget CLAIMS. Zooming out makes every
+       widget smaller, so the area the previous, larger layout covered is never
+       invalidated by anyone -- and wherever nothing new is drawn over it, the
+       old pixels stay on screen.
+
+       Inside the grid that is invisible, because the row below moves up and
+       paints over the gap. It shows at the END of the content, where there is
+       nothing following to overwrite it: in computer:/ the Network Locations
+       group is last, so zooming out from a large icon size left fragments of
+       the old 128px NAS and Network icons sitting under the new 77px ones.
+       Measured with EXXOS_ICON_DEBUG=1 -- the new icons are sized correctly and
+       identically to the drive tiles, so this was never a sizing bug.
+
+       A zoom step is a rare, user-driven event, so repainting the whole scene
+       here costs nothing that anybody can perceive. */
+    if (scene()) {
+        scene()->update();
+    } else {
+        update();
+    }
 }
 
 void KItemListView::exxosBeginLayoutSwitch()
