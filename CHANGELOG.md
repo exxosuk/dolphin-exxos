@@ -6,6 +6,12 @@ Versions are `major.minor.patch`: the patch number moves with each change, the
 minor number with each push to the repository. `exxos-desktop` and
 `exxos-icons` are released together and share a version number.
 
+## 1.9.21
+
+* Removed a tool from the package that should not have been in it. 1.9.20 was
+  built before it was taken out of the tree, so the published package and the
+  repository disagreed for a few hours.
+
 ## 1.9.20 — colours and blur measured rather than guessed
 
 **Colours.** `exxos-win-colours` reads the palette out of a Windows registry
