@@ -2133,6 +2133,28 @@ void KStandardItemListWidget::updateAdditionalInfoTextColor()
 
 void KStandardItemListWidget::drawPixmap(QPainter* painter, const QPixmap& pixmap)
 {
+    /* Exxos/Win7: never let the icon paint outside its own cell.
+
+       Zooming resizes the CELL immediately but ANIMATES the icon size (see
+       doLayout()), so for the length of that animation the icon is still the
+       old, larger size inside a cell that has already shrunk. Nothing clipped
+       it, so it spilled over its neighbours and over the item highlight, and
+       the view does not invalidate other widgets' rects to clean up after it.
+
+       It showed worst on the Network tiles in computer:/ -- they carry no
+       capacity bar, so the icon is vertically centred in a short row with
+       nothing beside it to hide the overflow, and they are the last group, so
+       nothing repaints over the mess afterwards. Measured with
+       EXXOS_ICON_DEBUG=1: the finished layout is correct and identical to the
+       drive tiles, which is why this only ever showed for a moment and looked
+       like the icons themselves were wrong.
+
+       Clipping is the right answer rather than dropping the animation: the
+       animation is what stops the zoom snapping. */
+    QRectF clip(QPointF(0, 0), size());
+    painter->save();
+    painter->setClipRect(clip, Qt::IntersectClip);
+
     if (m_scaledPixmapSize != pixmap.size() / pixmap.devicePixelRatio()) {
         QPixmap scaledPixmap = pixmap;
         KPixmapModifier::scale(scaledPixmap, m_scaledPixmapSize * qApp->devicePixelRatio());
@@ -2146,6 +2168,7 @@ void KStandardItemListWidget::drawPixmap(QPainter* painter, const QPixmap& pixma
     } else {
         painter->drawPixmap(m_pixmapPos, pixmap);
     }
+    painter->restore();
 }
 
 void KStandardItemListWidget::drawSiblingsInformation(QPainter* painter)
