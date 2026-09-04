@@ -8,6 +8,65 @@ minor number with each push to the repository. `exxos-desktop` and
 
 ## Unreleased
 
+### 1.9.20 — the real Windows icons, and colours taken from Windows rather than guessed
+
+**Icons.** The Win7-style icon theme is a Linux-made imitation. Measured at 48px
+its folder body is `#EED56E` against Microsoft's `#D8C066` -- about 10% brighter
+and flatter, which is why folders washed out against a near-white file list.
+`exxos-win-icons` extracts the genuine icons from `imageres.dll` on a mounted
+Windows partition and installs them as a separate theme inheriting the Exxos
+one, so only the names it covers change. 630 files, about 8 MB, covering
+folders, recycle bin, documents, images, video, audio, fonts, mail, drives,
+optical media, camera, phone, printer, network folders, search, games and users.
+
+These icons are NOT shipped and will not be. They are Microsoft's, and the apt
+repository is public. The package carries the 6.5 KB extractor and nothing
+derived from Windows -- each machine takes icons from its own licensed
+installation.
+
+**Colours.** `exxos-win-colours` reads the palette out of a Windows registry
+hive, so the scheme now carries real values instead of approximations: window
+and button `240,240,240`, selection `51,153,255`, tooltip `255,255,225`, title
+bars `153,180,209` active and `191,205,219` inactive. View stays at
+`252,252,251` -- Windows uses pure white, but Chromium takes that as its page
+base and pages went blinding.
+
+**Blur.** Strength 5, from Windows 7's own `ColorizationBlurBalance=34` out of
+100. At KWin's default the glass is opaque to detail: the colour behind comes
+through but every shape is smeared, which reads as the transparency not working
+at all.
+
+**GTK and browsers.** `exxos-gtk-colours` writes the KDE scheme into
+`colors.css`, which is what GTK applications and Chromium browsers actually
+read. Plasma only regenerates that where `kde-gtk-config` is installed; without
+it a browser toolbar sits on a stale palette indefinitely. Chrome paints its
+toolbar from `theme_bg_color` while Brave uses `theme_base_color` and takes the
+tab strip from `theme_bg_color`, so the two are set deliberately rather than
+left at the scheme's own values. `exxos-browser-theme` sets every Chrome, Brave
+and Chromium profile to follow the system theme and use the window manager's
+title bar.
+
+**Desktop.** `exxos-arrange-desktop` creates the standard icons and puts My
+Computer, System Settings, Discover and the Wastebin down the top-left, writing
+a `positions` key where Plasma has never made one.
+
+**Fixed.** Icon packaging corrupted SVGs: the metadata stripper mishandled
+`<sodipodi:namedview>` elements with children, leaving an orphaned closing tag,
+so six icons -- including `preferences-system` and `go-previous` -- shipped as
+malformed XML and drew nothing. The build now refuses to write an SVG the trim
+would break. Dropping oversized icons also left 28 dangling symlinks, which are
+now removed. `rebuild-overrides.sh` wrote its backups into the packaged,
+root-owned directory, losing the previous overrides while reporting success;
+they now go to `~/.local/share/exxos/plasmoid-superseded/`.
+
+**Dolphin.** Zooming left fragments of the previous icons behind: the cell
+resizes at once but the icon size animates, so for the length of that animation
+the icon is larger than the cell and nothing clipped it. Both the icon and the
+item name are now clipped to the widget's rect. Recent Files and Recent
+Locations order by when a thing was used rather than by file modification time,
+which had buried anything on a drive that is only ever read from. "Send to
+Desktop (create shortcut)" added to the item context menu.
+
 ### Dolphin Exxos Edition 1.9.0 — the unmount work, and the plasmoid patches made to apply
 
 The PC and the laptop had drifted apart: the PC carried 1.8.10 to 1.8.13, none of
