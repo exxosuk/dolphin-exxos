@@ -202,6 +202,23 @@ fi
 # --- clear Plasma theme caches so the new theme renders immediately ---
 rm -f "$HOME/.cache/plasma-svgelements"* "$HOME/.cache/plasma_theme_"*.kcache "$HOME/.cache/icon-cache.kcache" 2>/dev/null
 
+# --- reload the compositor, or the window frame will not change -----------
+#
+# The window decoration is an Aurorae theme, and KWin renders it once and keeps
+# it. `qdbus org.kde.KWin /KWin reconfigure` re-reads settings but does NOT
+# reload decoration.svg, and clearing ~/.cache/aurorae* does not either -- the
+# title bars carry on exactly as before and the theme looks broken when it is
+# not. Measured: a maximized title bar stayed a flat opaque colour across the
+# whole width until the compositor was actually replaced.
+if [ -n "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] && command -v kwin_x11 >/dev/null 2>&1; then
+    rm -f "$HOME/.cache/aurorae"* 2>/dev/null
+    echo
+    echo "Reloading the window decoration..."
+    (nohup kwin_x11 --replace >/dev/null 2>&1 &) 
+    sleep 5
+    echo "  + done"
+fi
+
 echo
 echo "Done. Log out and back in for the full effect."
 echo "Undo with: exxos-theme-apply --undo"
