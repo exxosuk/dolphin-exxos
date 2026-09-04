@@ -1,0 +1,174 @@
+#!/bin/bash
+# Put the four standard Exxos icons down the top-left of the desktop, in order:
+#
+#     My Computer
+#     System Settings
+#     Discover
+#     Wastebin
+#
+#   exxos-arrange-desktop            create any missing entries and arrange
+#   exxos-arrange-desktop --dry-run  say what it would do, change nothing
+#
+# WHY THIS IS FIDDLY
+# The first three are .desktop files in ~/Desktop, and the Folder View stores
+# their grid cells in one `positions` key per screen resolution. The Wastebin is
+# not a file at all -- it is a separate Plasma applet, org.kde.plasma.trash, and
+# its place is a pixel geometry in ItemGeometries. So "arrange these four" means
+# writing two unrelated settings in two different formats.
+#
+# The positions array is ["cols","rows", url, ROW, COL, url, ROW, COL, ...].
+# Row before column, which is the opposite way round to how it reads. Verified
+# against a working desktop: UT2004.exe at 0,1 sits to the RIGHT of my-computer
+# at 0,0, and systemsettings at 1,0 sits BELOW it.
+set -u
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/plasma-org.kde.plasma.desktop-appletsrc"
+DESK="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
+DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
+
+[ -f "$CONF" ] || { echo "No Plasma desktop configuration at $CONF" >&2; exit 1; }
+
+# --- 1. the desktop entries, if they are not there already -----------------
+DOLPHIN=$(command -v dolphin-exxos || echo /opt/exxos-dolphin/bin/dolphin)
+
+make_entry() {   # file, Name, Comment, Icon, Exec
+    local f="$DESK/$1"
+    [ -e "$f" ] && return 0
+    if [ "$DRY" = 1 ]; then echo "  would create $1"; return 0; fi
+    cat > "$f" <<ENTRY
+[Desktop Entry]
+Type=Application
+Name=$2
+Comment=$3
+Icon=$4
+Exec=$5
+Terminal=false
+StartupNotify=true
+ENTRY
+    chmod +x "$f"
+    echo "  created $1"
+}
+
+mkdir -p "$DESK"
+make_entry my-computer.desktop "My Computer" "All drives on this machine, with free space" \
+           computer "$DOLPHIN --new-window computer:/"
+make_entry systemsettings.desktop "System Settings" "Configure this desktop" \
+           preferences-system "systemsettings5"
+if command -v plasma-discover >/dev/null 2>&1; then
+    make_entry org.kde.discover.desktop "Discover" "Install and update software" \
+               plasmadiscover "plasma-discover"
+fi
+
+# --- 2. the three icons' grid cells ----------------------------------------
+python3 - "$CONF" "$DRY" <<'PY'
+import re, sys, subprocess
+conf, dry = sys.argv[1], sys.argv[2] == "1"
+text = open(conf).read()
+
+order = ["desktop:/my-computer.desktop",
+         "desktop:/systemsettings.desktop",
+         "desktop:/org.kde.discover.desktop"]
+
+m = re.search(r'^positions=(\{.*\})$', text, re.M)
+if not m:
+    print("  no positions key yet -- Plasma writes one once icons are moved")
+    sys.exit(0)
+
+raw = m.group(1)
+# The value is escaped for KConfig: \\, separates array elements.
+def parse(block):
+    return [p.strip('"') for p in block.split('\\\\,')]
+
+changed = False
+out = raw
+for screen in re.findall(r'"(\d+x\d+)":\[(.*?)\]', raw, re.S):
+    res, body = screen
+    items = parse(body)
+    head, rest = items[:2], items[2:]
+    cells = {}                      # url -> [row, col]
+    seq = []
+    for i in range(0, len(rest) - 2, 3):
+        url, row, col = rest[i], rest[i+1], rest[i+2]
+        cells[url] = [row, col]; seq.append(url)
+
+    # Anything sitting in a cell we want, and not one of ours, gets pushed to
+    # the first free cell in the same column further down -- never overwritten.
+    wanted = {url: [str(i), "0"] for i, url in enumerate(order)}
+    taken = {tuple(v) for u, v in cells.items() if u not in wanted}
+    for url, cell in list(cells.items()):
+        if url in wanted:
+            continue
+        if cell in [v for v in wanted.values()]:
+            r = max(int(c[0]) for c in cells.values()) + 1
+            while (str(r), cell[1]) in taken:
+                r += 1
+            taken.add((str(r), cell[1]))
+            cells[url] = [str(r), cell[1]]
+            changed = True
+    for url, cell in wanted.items():
+        if url in cells and cells[url] != cell:
+            cells[url] = cell; changed = True
+        elif url not in cells:
+            cells[url] = cell; seq.append(url); changed = True
+
+    flat = list(head)
+    for url in seq:
+        flat += [url, cells[url][0], cells[url][1]]
+    newbody = '\\\\,'.join('"%s"' % p for p in flat)
+    out = out.replace(body, newbody)
+
+if not changed:
+    print("  icon cells already correct")
+elif dry:
+    print("  would rewrite positions for", ", ".join(o.split('/')[-1] for o in order))
+else:
+    open(conf, "w").write(text.replace(raw, out))
+    print("  icon cells set: My Computer, System Settings, Discover down column 0")
+PY
+
+# --- 3. the Wastebin applet, which is a geometry, not a cell ---------------
+python3 - "$CONF" "$DRY" <<'PY'
+import re, sys
+conf, dry = sys.argv[1], sys.argv[2] == "1"
+text = open(conf).read()
+
+# Find the trash applet's id, then place it in the fourth row of column 0.
+mid = None
+for block in re.finditer(r'^\[Containments\]\[(\d+)\]\[Applets\]\[(\d+)\](.*?)(?=^\[|\Z)',
+                         text, re.M | re.S):
+    if 'plugin=org.kde.plasma.trash' in block.group(3):
+        mid = block.group(2)
+if mid is None:
+    print("  no Wastebin applet on the desktop -- nothing to place")
+    sys.exit(0)
+
+changed = False
+for key, val in re.findall(r'^(ItemGeometries[^=]*)=(.*)$', text, re.M):
+    cell = None
+    for entry in val.split(';'):
+        if not entry.strip():
+            continue
+        name, _, geom = entry.partition(':')
+        parts = geom.split(',')
+        if len(parts) >= 4 and name != "Applet-%s" % mid:
+            cell = int(parts[3])          # borrow another applet's icon size
+    size = cell or 96
+    want = "Applet-%s:0,%d,%d,%d,0;" % (mid, size * 3, size, size)
+    kept = [e for e in val.split(';') if e.strip() and not e.startswith("Applet-%s:" % mid)]
+    new = ';'.join(kept) + (';' if kept else '') + want
+    if new != val:
+        changed = True
+        if not dry:
+            text = text.replace("%s=%s" % (key, val), "%s=%s" % (key, new))
+if not changed:
+    print("  Wastebin already in place")
+elif dry:
+    print("  would move the Wastebin under Discover")
+else:
+    open(conf, "w").write(text)
+    print("  Wastebin moved under Discover")
+PY
+
+if [ "$DRY" = 0 ]; then
+    echo
+    echo "Log out and back in, or restart Plasma, for the desktop to pick this up."
+fi

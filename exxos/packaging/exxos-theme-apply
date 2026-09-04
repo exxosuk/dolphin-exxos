@@ -96,6 +96,22 @@ kwriteconfig5 --file kdeglobals --group KDE --key LookAndFeelPackage com.exxos.w
 
 # --- icon theme ---
 ICON_NAME=Win7-plasma5up-scalable-icontheme-blackysgate.de
+
+# A copy in the user's home SHADOWS the packaged one entirely -- icon lookup
+# takes the first theme of that name it finds, and ~/.local/share/icons comes
+# first. Early copies of this theme were incomplete, so a machine that was set
+# up by hand before the package existed keeps using the broken copy and shows
+# missing or black icons in menus, in Dolphin's toolbar and on the desktop,
+# while the good copy sits unused in /usr/share. Move it aside rather than
+# delete it: it is 400-odd MB and it is the user's, not ours.
+if [ -d "$HOME/.local/share/icons/$ICON_NAME" ] && [ -d "/usr/share/icons/$ICON_NAME" ]; then
+    aside="$HOME/.local/share/icons/$ICON_NAME.supersededby-package-$(date +%Y%m%d-%H%M%S)"
+    mv "$HOME/.local/share/icons/$ICON_NAME" "$aside"
+    echo "  + a home copy of the icon theme was shadowing the packaged one"
+    echo "    moved to: $aside"
+    echo "    delete it once you are happy; nothing uses it now."
+fi
+
 if [ -d "/usr/share/icons/$ICON_NAME" ] || [ -d "$HOME/.local/share/icons/$ICON_NAME" ]; then
     kwriteconfig5 --file kdeglobals --group Icons --key Theme "$ICON_NAME"
     echo "  + icon theme found and selected"
@@ -134,6 +150,13 @@ else
     echo
     echo "  ! Plasmoid patches not found at $PATCH_DIR"
     echo "    Start menu and quick-launch spacing will stay stock."
+fi
+
+# --- the standard desktop icons, and where they sit ---
+if command -v exxos-arrange-desktop >/dev/null 2>&1; then
+    echo
+    echo "Desktop icons..."
+    exxos-arrange-desktop | sed 's/^/  /'
 fi
 
 # --- brightness, and the tray control for it ---

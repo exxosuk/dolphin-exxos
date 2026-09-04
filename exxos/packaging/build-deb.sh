@@ -65,6 +65,9 @@ install -D -m 644 "$TW/kio-computer/computer.protocol" \
 install -D -m 755 "$TW/system-tools/exxos-brightness" \
         "$STAGE/usr/bin/exxos-brightness"
 
+install -D -m 755 "$TW/system-tools/exxos-arrange-desktop" \
+        "$STAGE/usr/bin/exxos-arrange-desktop"
+
 install -D -m 644 "$TW/system-tools/61-exxos-removable-polling.rules" \
         "$STAGE/etc/udev/rules.d/61-exxos-removable-polling.rules"
 
