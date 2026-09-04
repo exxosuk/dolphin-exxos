@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Exxos desktop &mdash; apt repository</title>
+<style>
+ body{font:16px/1.6 system-ui,sans-serif;max-width:46rem;margin:3rem auto;padding:0 1rem;color:#222}
+ pre{background:#f4f4f4;padding:1rem;overflow-x:auto;border-left:3px solid #1f94e0}
+ .warn{background:#fff6e0;border-left:3px solid #e0a800;padding:1rem}
+ code{background:#f4f4f4;padding:.1em .3em}
+</style>
+<h1>Exxos desktop</h1>
+<p>A Windows&nbsp;7 style desktop for MX Linux&nbsp;23 &mdash; a patched Dolphin with an
+Explorer drive view, a <code>computer:/</code> that lists every drive including empty
+bays, media-change detection, network discovery, and the theme to match.</p>
+
+<p class="warn"><strong>ALPHA, and MX&nbsp;23 only.</strong> Built and tested on MX&nbsp;23
+(Debian&nbsp;12, Plasma&nbsp;5.27, KF5&nbsp;5.103, Qt&nbsp;5.15.8, amd64) and nothing else.
+It is compiled against that exact ABI and will not install elsewhere.</p>
+
+<h2>Install</h2>
+<pre>sudo mkdir -p /etc/apt/keyrings
+sudo wget -O /etc/apt/keyrings/exxos-archive-keyring.gpg \
+     https://exxosuk.github.io/dolphin-exxos/exxos-archive-keyring.gpg
+
+echo "deb [signed-by=/etc/apt/keyrings/exxos-archive-keyring.gpg] https://exxosuk.github.io/dolphin-exxos alpha main" \
+  | sudo tee /etc/apt/sources.list.d/exxos.list
+
+sudo apt update
+sudo apt install exxos-desktop
+exxos-theme-apply        # as your normal user, NOT with sudo</pre>
+
+<p>Log out and back in for the window decorations.</p>
+
+<h2>Remove</h2>
+<pre>sudo apt remove exxos-desktop
+exxos-theme-apply --undo
+sudo rm /etc/apt/sources.list.d/exxos.list /etc/apt/keyrings/exxos-archive-keyring.gpg</pre>
+
+<p>Source, and what every change is for:
+<a href="https://github.com/exxosuk/dolphin-exxos">github.com/exxosuk/dolphin-exxos</a></p>
+<p>Current version: <strong>1.9.27</strong></p>

@@ -1,0 +1,43 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: amd64
+Codename: alpha
+Components: main
+Date: Fri, 04 Sep 2026 20:54:28 +0000
+Description: Windows 7 style desktop for MX 23 (ALPHA, unsupported elsewhere)
+Label: Exxos desktop
+Origin: Exxos
+Suite: alpha
+MD5Sum:
+ 76a84cad66406f5212ab3ca6d2bd1f3e              218 Release
+ fefc368ec203a52358a509109694ae8d             2798 main/binary-amd64/Packages
+ 27a139fae8eba817e5b4e0cd337cf260             1475 main/binary-amd64/Packages.gz
+SHA1:
+ a9d4d4f784f9f4503477487472f788dfdb0afd2b              218 Release
+ a3d02c72df662148e5cbde9a36546383ab53a72c             2798 main/binary-amd64/Packages
+ 750a2bf26d32fe37340fe5133718745d6c679635             1475 main/binary-amd64/Packages.gz
+SHA256:
+ 811079a7ae6e16859e5e07e3b84aaefdf4f919cadd3b4108e9f6982418832ce3              218 Release
+ c1bfb41dc1c202c9c2a70acf61bc59f3b4e922a3db1ac0b17d797b015fbe9802             2798 main/binary-amd64/Packages
+ 210ca1c7eb1ee7981c83215907cebb507b9c4eec6175f490f185df3088ec1a08             1475 main/binary-amd64/Packages.gz
+SHA512:
+ 91b498d11a08e45422d75852a86c39be23976634c660ac8d3722ba35e956d0f4250cec8d3848729e303f7032a4f9896ae4005862fd704857d5b3ffc78868c9f8              218 Release
+ 03c149320bddd905adc69a699f15a1dfcc6841d40064c1e8258a546c04b409031ae1aca348f0787359c41fdf893e0ae4840066631a815a6ef9ce3e08d10cfe2b             2798 main/binary-amd64/Packages
+ dd5cffa3d062d3d68767a77a47a4d357f8ebfd8efcd99d4eb8420cb9e9c0854d2cddb67eba800e537200488ca29eaa05d9d3fb231456a359b06bd3138daec100             1475 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEEAbN4nHyXIK8Rn1MCmxaoMnnFpDUFAmqbMAQACgkQmxaoMnnF
+pDUQwhAAjNdopnKa0150eQyFbdTXQG43W2OaPpJhZf+2cdDKTFcD9o8YcdqjyXW5
+GctjKQ4LZ/8TWdkygBMkgPCFV9DNIBeWYme4eiex0caZxEV81bCLZ+azzSJARwop
+KMcSklcVkOkmmNB5yQ4A9d2x9rarNULTQX/oiL2N9oJP7blZ5/53b9bWwiES989O
+EpE8Gw45vrBhwAnEfVF6OMeXfsJDsdg9MbEldNrckrLYHCSEt3Q0kdfFnvBLG1DD
+D9oRw+6gXmSrkxMphT1hg9qm1cYmZJmq8XbNaULw7OHK7Agm4PC9agBMmY1J1r2d
+OhS/MxUg5Sxj18HsChF0/Fm0jbgWxzDdUe04mw9j/ABGNkkkqoV8Dl7Eb058/BnG
+eQPfbop7EKxvoWJdoMtH8Tpizt5/sPLLxTnJCIGHwjF8nROPQ09oCuiGAvE4mDrT
+KHc/Xx9dXhDchj+XHUpyKWHoAhOt/8ofPmZxxaBc9pqT6LzbXpgSW6x4PLLYMA1G
+MLWMiPpxUJa25jhWF+diUn0ePIHTcMXuw5jMyNJBbq4ORY53WF+8qzBUW2zrYEDz
+KTCy6wrH0tQySshovHr6//KV6upDFKM9bedfG9JGWNq1tnz6tXmmY1YW1k/2bz6T
+NgwFve0IMB3MNZqXbFeuWzSSOvhj6Ln6HQmBg5M0HE13oTHLjR4=
+=rysD
+-----END PGP SIGNATURE-----

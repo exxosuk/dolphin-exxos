@@ -1,0 +1,61 @@
+Package: exxos-desktop
+Version: 1.9.27
+Architecture: amd64
+Maintainer: exxos <exxos_uk@yahoo.co.uk>
+Installed-Size: 22044
+Depends: dolphin (>= 4:22.12), kio, libkf5kiocore5, libkf5kiowidgets5,
+ libkf5kiofilewidgets5, libkf5solid5, libkf5i18n5, libkf5coreaddons5,
+ libkf5parts5, libkf5newstuff5, libkf5kcmutils5, libkf5crash5,
+ libqt5core5a, libqt5widgets5, libqt5gui5, libqt5dbus5, libqt5network5,
+ libphonon4qt5-4, udev, exxos-icons (= 1.9.27)
+Recommends: udisks2, samba-common-bin
+Filename: pool/main/e/exxos-desktop/exxos-desktop_1.9.27_amd64.deb
+Size: 3068808
+MD5sum: 161b91d218122354c0f6b8d953b8b46a
+SHA1: 88ca74cccc5c9ff30696de93d63c0df96c4f70c1
+SHA256: 355a7e3d376990b9ee40cb1ca7c714b8d6e1621416668b5f88da7d471fd12004
+Section: x11
+Priority: optional
+Homepage: https://github.com/exxosuk/dolphin-exxos
+Description: ALPHA - Windows 7 style desktop for MX 23 (Dolphin + theme)
+ Makes MX Linux behave the way someone arriving from Windows 7 expects it to,
+ rather than asking them to learn a different set of habits first.
+ .
+ Includes Dolphin Exxos Edition - a patched Dolphin with an Explorer style
+ tile view for drives (icon, name, capacity bar, free space), a computer:/
+ that lists every drive including empty bays, network machines found by
+ WS-Discovery, and media-change detection for drives the kernel does not poll.
+ .
+ ALPHA. Built and tested ONLY on MX 23 (Debian 12, Plasma 5.27, KF5 5.103,
+ Qt 5.15.8, amd64). No other release is tested or supported.
+ .
+ The packaged Dolphin is left alone: this installs beside it under /opt and
+ removing the package puts the machine back as it was.
+ .
+ The matching icon theme is in exxos-icons, which is installed with this.
+ It is a separate package only because it is 385 MB - twenty times everything
+ else here - so it can be rebuilt and republished independently. It is a
+ dependency rather than a recommendation because MX turns recommendations off
+ by default, and a first install with no icons looks broken.
+
+Package: exxos-icons
+Version: 1.9.27
+Architecture: all
+Maintainer: exxos <exxos_uk@yahoo.co.uk>
+Installed-Size: 394836
+Depends: hicolor-icon-theme
+Filename: pool/main/e/exxos-icons/exxos-icons_1.9.27_all.deb
+Size: 42942916
+MD5sum: 93e554068da5950d756556ef845cf759
+SHA1: 957589fc5cb450ccc46da9e53c3214bb4ba3cad2
+SHA256: 5609a35f9a45d48b6ffe177069820727790a8d0f7288f0478cd6d0a23b738238
+Section: x11
+Priority: optional
+Homepage: https://github.com/exxosuk/dolphin-exxos
+Description: Classic Windows-style icon theme for the Exxos desktop
+ A scalable icon theme in the classic Windows style, so the Exxos desktop
+ looks right from the first login instead of falling back to Breeze.
+ .
+ Artwork by Blackcrack (blackysgate.de), CC BY-NC-SA. Installed under
+ /usr/share/icons; select it with exxos-theme-apply or in System Settings.
+
