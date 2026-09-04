@@ -27,7 +27,21 @@ normal view, the way Recent Files does.
   file managers are not Dolphin either, so the same two actions ship as a KIO
   service menu, under a **Favourites** submenu, backed by `exxos-favourite`.
 
-Tabs across the top, so favourites can be grouped, are the next piece.
+### Favourites tabs
+
+A row of tabs across the top of the Favourites view -- All, plus one per group.
+A tab **is** a directory inside the favourites folder, so a tab holds shortcuts
+the way a folder holds files and there is no list, order file or index to fall
+out of step with what is on disk.
+
+* Right-click the tab row -> **Add Tab...** and type a name.
+* The **x** on a tab removes it, after asking -- it says how many shortcuts go
+  with it, because they do.
+* **All** is the root of the favourites folder and has no close button: it is
+  where a favourite goes when no tab was chosen.
+* The row only appears inside Favourites, and only one level down counts as a
+  tab -- a folder you put inside a tab is an ordinary folder.
+
 
 * `install.sh --check` now reports the worker Dolphin actually loads. It only
   ever compared the root-owned copy under `/usr/lib`, which this build does not

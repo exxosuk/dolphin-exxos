@@ -31,6 +31,7 @@ class KMessageWidget;
 class QAction;
 class QGridLayout;
 class QUrl;
+class QTabBar;
 class DolphinSearchBox;
 class DolphinStatusBar;
 namespace SelectionMode {
@@ -267,6 +268,14 @@ Q_SIGNALS:
     void activeTabRequested(const QUrl &url);
 
 private Q_SLOTS:
+    /* Exxos/Win7: the Favourites tab row. A tab is a directory inside the
+       favourites folder -- see dolphinviewcontainer.cpp. */
+    void exxosFavouritesTabActivated(int index);
+    void exxosFavouritesTabClosed(int index);
+    void exxosFavouritesTabMenu(const QPoint &pos);
+    void exxosUpdateFavouritesTabs(const QUrl &url);
+
+
     /**
      * Updates the number of items (= number of files + number of
      * directories) in the statusbar. If files are selected, the number
@@ -404,6 +413,11 @@ private Q_SLOTS:
     void slotOpenUrlFinished(KJob* job);
 
 private:
+    static QString exxosFavouritesRoot();
+    static bool exxosInFavourites(const QUrl &url, QString *tabName = nullptr);
+    QTabBar *m_exxosFavTabs = nullptr;
+
+
     /**
      * @return True if the URL protocol is a search URL (e. g. baloosearch:// or filenamesearch://).
      */

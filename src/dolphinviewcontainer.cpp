@@ -38,6 +38,15 @@
 #include <QDesktopServices>
 #include <QDropEvent>
 #include <QGridLayout>
+#include <QTabBar>
+#include <QDir>
+#include <QFileInfo>
+#include <QInputDialog>
+#include <QMenu>
+#include <QSignalBlocker>
+#include <KMessageBox>
+#include <KStandardGuiItem>
+#include "dolphincontextmenu.h"
 #include <QGuiApplication>
 #include <QTimer>
 #include <QUrl>
@@ -48,10 +57,11 @@ struct LayoutStructure {
     int searchBox               = 0;
     int messageWidget           = 1;
     int selectionModeTopBar     = 2;
-    int view                    = 3;
-    int selectionModeBottomBar  = 4;
-    int filterBar               = 5;
-    int statusBar               = 6;
+    int exxosFavouritesTabs     = 3;   // Exxos/Win7: tabs inside Favourites
+    int view                    = 4;
+    int selectionModeBottomBar  = 5;
+    int filterBar               = 6;
+    int statusBar               = 7;
 };
 constexpr LayoutStructure positionFor;
 
@@ -210,13 +220,44 @@ DolphinViewContainer::DolphinViewContainer(const QUrl& url, QWidget* parent) :
     connect(undoManager, &KIO::FileUndoManager::jobRecordingFinished,
             this, &DolphinViewContainer::delayedStatusBarUpdate);
 
+    /* Exxos/Win7: the tab row for Favourites.
+
+       Tabs are simply directories inside the favourites folder, so a tab holds
+       shortcuts the way a folder holds files and there is no separate state to
+       keep in step. Hidden everywhere else. */
+    m_exxosFavTabs = new QTabBar(this);
+    m_exxosFavTabs->setExpanding(false);
+    m_exxosFavTabs->setDrawBase(false);
+    m_exxosFavTabs->setTabsClosable(true);
+    m_exxosFavTabs->setContextMenuPolicy(Qt::CustomContextMenu);
+    m_exxosFavTabs->hide();
+    connect(m_exxosFavTabs, &QTabBar::currentChanged,
+            this, &DolphinViewContainer::exxosFavouritesTabActivated);
+    connect(m_exxosFavTabs, &QTabBar::tabCloseRequested,
+            this, &DolphinViewContainer::exxosFavouritesTabClosed);
+    connect(m_exxosFavTabs, &QWidget::customContextMenuRequested,
+            this, &DolphinViewContainer::exxosFavouritesTabMenu);
+
     m_topLayout->addWidget(m_searchBox, positionFor.searchBox, 0);
     m_topLayout->addWidget(m_messageWidget, positionFor.messageWidget, 0);
+    /* The view's own urlChanged, not just setUrl(): setUrl is the navigation
+       path, so opening a window straight onto Favourites never reached it and
+       the tab row stayed hidden. */
+    connect(m_view, &DolphinView::urlChanged,
+            this, &DolphinViewContainer::exxosUpdateFavouritesTabs);
+
+    m_topLayout->addWidget(m_exxosFavTabs, positionFor.exxosFavouritesTabs, 0);
     m_topLayout->addWidget(m_view, positionFor.view, 0);
     m_topLayout->addWidget(m_filterBar, positionFor.filterBar, 0);
     m_topLayout->addWidget(m_statusBar, positionFor.statusBar, 0);
 
     setSearchModeEnabled(isSearchUrl(url));
+
+    /* Once, for the URL this container was BUILT with. Each Dolphin tab has its
+       own container, and a view constructed with a URL never emits urlChanged
+       for it -- so a window opened straight onto Favourites, or a tab restored
+       from the last session, showed no tab row at all. */
+    exxosUpdateFavouritesTabs(url);
 
     connect(DetailsModeSettings::self(), &KCoreConfigSkeleton::configChanged, this, [=]() {
         if (view()->viewMode() == DolphinView::Mode::DetailsView) {
@@ -634,6 +675,170 @@ void DolphinViewContainer::setUrl(const QUrl& newUrl)
 #if HAVE_KACTIVITIES
     m_activityResourceInstance->setUri(newUrl);
 #endif
+
+    exxosUpdateFavouritesTabs(newUrl);
+}
+
+
+/* Exxos/Win7: the Favourites tab row.
+
+   A tab IS a directory inside the favourites folder. Nothing else is stored:
+   no list of tabs, no order file, no index to fall out of step with what is on
+   disk. Adding a tab makes a directory, removing one removes it, and the
+   shortcuts inside it go with it -- which is why removing asks first. */
+QString DolphinViewContainer::exxosFavouritesRoot()
+{
+    return exxosFavouritesDir();
+}
+
+bool DolphinViewContainer::exxosInFavourites(const QUrl &url, QString *tabName)
+{
+    if (!url.isLocalFile()) {
+        return false;
+    }
+    const QString root = exxosFavouritesRoot();
+    const QString path = QDir::cleanPath(url.toLocalFile());
+    if (path == root) {
+        if (tabName) {
+            tabName->clear();
+        }
+        return true;
+    }
+    if (path.startsWith(root + QLatin1Char('/'))) {
+        const QString rest = path.mid(root.length() + 1);
+        /* Only one level down is a tab. Deeper is a folder the user put inside
+           a tab, and that is an ordinary folder, not another tab. */
+        if (!rest.contains(QLatin1Char('/'))) {
+            if (tabName) {
+                *tabName = rest;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+void DolphinViewContainer::exxosUpdateFavouritesTabs(const QUrl &url)
+{
+    QString current;
+    const bool inFav = exxosInFavourites(url, &current);
+    if (qEnvironmentVariableIsSet("EXXOS_FAV_DEBUG")) {
+        qWarning("exxos-fav: url=%s root=%s inFav=%d tab='%s'",
+                 qPrintable(url.toString()), qPrintable(exxosFavouritesRoot()),
+                 int(inFav), qPrintable(current));
+    }
+    if (!inFav) {
+        m_exxosFavTabs->hide();
+        return;
+    }
+
+    QSignalBlocker blocker(m_exxosFavTabs);
+    while (m_exxosFavTabs->count() > 0) {
+        m_exxosFavTabs->removeTab(0);
+    }
+
+    /* The root itself is the first tab and cannot be closed: it is where a
+       favourite goes when the user has not chosen a tab. */
+    m_exxosFavTabs->addTab(i18nc("@title Favourites tab", "All"));
+    m_exxosFavTabs->setTabData(0, QString());
+    if (auto *b = m_exxosFavTabs->tabButton(0, QTabBar::RightSide)) {
+        b->resize(0, 0);
+        b->hide();
+    }
+
+    const QStringList dirs = QDir(exxosFavouritesRoot())
+        .entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    int selected = 0;
+    for (const QString &d : dirs) {
+        const int i = m_exxosFavTabs->addTab(d);
+        m_exxosFavTabs->setTabData(i, d);
+        if (d == current) {
+            selected = i;
+        }
+    }
+    m_exxosFavTabs->setCurrentIndex(selected);
+    m_exxosFavTabs->show();
+}
+
+void DolphinViewContainer::exxosFavouritesTabActivated(int index)
+{
+    if (index < 0 || !m_exxosFavTabs->isVisible()) {
+        return;
+    }
+    const QString name = m_exxosFavTabs->tabData(index).toString();
+    QString path = exxosFavouritesRoot();
+    if (!name.isEmpty()) {
+        path += QLatin1Char('/') + name;
+    }
+    const QUrl target = QUrl::fromLocalFile(path);
+    if (target != url()) {
+        Q_EMIT writeStateChanged(false);
+        setUrl(target);
+    }
+}
+
+void DolphinViewContainer::exxosFavouritesTabClosed(int index)
+{
+    const QString name = m_exxosFavTabs->tabData(index).toString();
+    if (name.isEmpty()) {
+        return;   // "All" is the root; it is not a tab that can be removed
+    }
+    const QString path = exxosFavouritesRoot() + QLatin1Char('/') + name;
+    const int count = QDir(path).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).count();
+
+    /* Ask, because the shortcuts inside go with it. */
+    const QString question = count == 0
+        ? i18nc("@info", "Remove the Favourites tab <filename>%1</filename>?", name)
+        : i18ncp("@info", "Remove the Favourites tab <filename>%2</filename> and the shortcut in it?",
+                 "Remove the Favourites tab <filename>%2</filename> and the %1 shortcuts in it?",
+                 count, name);
+    if (KMessageBox::warningContinueCancel(
+            this, question,
+            i18nc("@title:window", "Remove Favourites Tab"),
+            KStandardGuiItem::remove()) != KMessageBox::Continue) {
+        return;
+    }
+
+    if (!QDir(path).removeRecursively()) {
+        return;
+    }
+    /* Standing in the tab that just went: fall back to All. */
+    if (url() == QUrl::fromLocalFile(path)) {
+        setUrl(QUrl::fromLocalFile(exxosFavouritesRoot()));
+    } else {
+        exxosUpdateFavouritesTabs(url());
+    }
+}
+
+void DolphinViewContainer::exxosFavouritesTabMenu(const QPoint &pos)
+{
+    QMenu menu(this);
+    QAction *add = menu.addAction(QIcon::fromTheme(QStringLiteral("tab-new")),
+                                  i18nc("@action:inmenu", "Add Tab..."));
+    if (menu.exec(m_exxosFavTabs->mapToGlobal(pos)) != add) {
+        return;
+    }
+
+    bool ok = false;
+    const QString name = QInputDialog::getText(
+        this, i18nc("@title:window", "Add Favourites Tab"),
+        i18nc("@label:textbox", "Name:"), QLineEdit::Normal, QString(), &ok).trimmed();
+    if (!ok || name.isEmpty()) {
+        return;
+    }
+    /* A tab is a directory, so the name has to be usable as one. */
+    if (name.contains(QLatin1Char('/')) || name.startsWith(QLatin1Char('.'))) {
+        KMessageBox::error(this, i18nc("@info", "A tab name cannot contain \"/\" or start with a dot."));
+        return;
+    }
+    const QString path = exxosFavouritesRoot() + QLatin1Char('/') + name;
+    if (QFileInfo::exists(path)) {
+        KMessageBox::error(this, i18nc("@info", "There is already a tab called <filename>%1</filename>.", name));
+        return;
+    }
+    if (QDir().mkpath(path)) {
+        setUrl(QUrl::fromLocalFile(path));
+    }
 }
 
 void DolphinViewContainer::setFilterBarVisible(bool visible)
