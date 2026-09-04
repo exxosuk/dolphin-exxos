@@ -117,7 +117,7 @@ def main():
     path = sys.argv[1] if len(sys.argv) > 1 else guess_hive()
     if not path or not os.path.exists(path):
         print("No NTUSER.DAT found. Mount the Windows partition and pass the path:")
-        print("  exxos-win-colours /media/you/WIN7/Users/you/NTUSER.DAT")
+        print("  exxos-win-colours /media/you/<windows>/Users/you/NTUSER.DAT")
         return 1
     print("# from %s" % path)
     h = Hive(path)
