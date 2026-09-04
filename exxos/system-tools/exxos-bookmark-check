@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+"""Check exported bookmarks and sort them by what actually happened.
+
+    exxos-bookmark-check bookmarks.html [output-dir] [--workers N]
+
+Reads a browser's exported bookmarks HTML, fetches every link, and writes one
+HTML page per outcome so the results can be read in a browser and the links
+clicked. Nothing is ever deleted -- deciding is the user's job.
+
+WHY THE TITLE MATTERS MORE THAN THE STATUS CODE
+A domain that lapsed and was picked up by a squatter still answers 200. The
+status code says the site is fine; the page title says it is now a casino. So a
+bookmark whose title no longer resembles the one it was saved under is reported
+separately, and that is the group most worth reading.
+
+WHY A BROWSER USER-AGENT
+A bare fetch gets 403 from about a quarter of sites that load perfectly well in
+a browser. Without a real user-agent the run condemns sites that are alive.
+
+HTTP AND HTTPS
+A bookmark saved as http:// may now be https:// only, and occasionally the
+reverse. Each URL is tried as written; if that fails at the connection level the
+other scheme is tried before calling it dead, and a bookmark that only works on
+the other scheme is reported as such -- it is worth updating rather than losing.
+"""
+import concurrent.futures as futures
+import gzip, html, io, os, re, ssl, sys, time
+import urllib.error, urllib.parse, urllib.request
+
+UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+      "Chrome/124.0.0.0 Safari/537.36")
+TIMEOUT = 12
+RE_LINK = re.compile(r'<A\s+HREF="([^"]+)"[^>]*>(.*?)</A>', re.I | re.S)
+RE_TITLE = re.compile(rb'<title[^>]*>(.*?)</title>', re.I | re.S)
+
+
+def read_bookmarks(path):
+    raw = open(path, encoding="utf-8", errors="replace").read()
+    out = []
+    for url, text in RE_LINK.findall(raw):
+        url = html.unescape(url)
+        if url.startswith(("http://", "https://")):
+            out.append((url, html.unescape(re.sub(r"<[^>]+>", "", text)).strip()))
+    return out
+
+
+def fetch(url):
+    """-> (code, final_url, title, error). code 0 means it never connected."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE      # an expired cert is not a dead site
+    req = urllib.request.Request(url, headers={
+        "User-Agent": UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-GB,en;q=0.9",
+        "Accept-Encoding": "gzip",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as r:
+            body = r.read(200_000)
+            if r.headers.get("Content-Encoding") == "gzip":
+                try:
+                    body = gzip.decompress(body)
+                except Exception:
+                    pass
+            m = RE_TITLE.search(body)
+            title = ""
+            if m:
+                enc = "utf-8"
+                ct = r.headers.get("Content-Type", "")
+                if "charset=" in ct:
+                    enc = ct.split("charset=")[-1].split(";")[0].strip() or "utf-8"
+                try:
+                    title = m.group(1).decode(enc, "replace")
+                except LookupError:
+                    title = m.group(1).decode("utf-8", "replace")
+                title = html.unescape(re.sub(r"\s+", " ", title)).strip()
+            return r.status, r.geturl(), title, ""
+    except urllib.error.HTTPError as e:
+        return e.code, url, "", ""
+    except Exception as e:
+        return 0, url, "", type(e).__name__
+
+
+def other_scheme(url):
+    if url.startswith("http://"):
+        return "https://" + url[len("http://"):]
+    if url.startswith("https://"):
+        return "http://" + url[len("https://"):]
+    return None
+
+
+def words(s):
+    return set(w for w in re.findall(r"[a-z0-9]{4,}", (s or "").lower()))
+
+
+def check(item):
+    url, saved = item
+    code, final, title, err = fetch(url)
+
+    switched = False
+    if code == 0:
+        alt = other_scheme(url)
+        if alt:
+            code2, final2, title2, err2 = fetch(alt)
+            if code2 and code2 < 400:
+                code, final, title, err, switched = code2, final2, title2, err2, True
+
+    host_before = urllib.parse.urlparse(url).netloc.lower().lstrip("www.")
+    host_after = urllib.parse.urlparse(final).netloc.lower().lstrip("www.")
+
+    if code == 0:
+        group = "dead"
+    elif code in (404, 410):
+        group = "gone"
+    elif code in (401, 403, 429) or code >= 500:
+        group = "blocked"
+    elif switched:
+        group = "scheme"
+    elif host_after and host_before and host_after != host_before:
+        group = "redirected"
+    else:
+        # Alive. Does it still look like what it was saved as? Compare the words
+        # in the two titles: a squatted domain answers 200 with a title that has
+        # nothing to do with the bookmark.
+        a, b = words(saved), words(title)
+        if saved and title and a and b and not (a & b):
+            group = "changed"
+        else:
+            group = "ok"
+    return group, url, saved, code, final, title, err
+
+
+GROUPS = [
+    ("changed",    "Title no longer matches — check these first",
+     "Answered normally, but the page title has nothing in common with the name it "
+     "was saved under. This is what a lapsed domain picked up by somebody else looks like."),
+    ("dead",       "Did not connect",
+     "No answer on either http or https: DNS gone, connection refused, or timed out."),
+    ("gone",       "404 / 410",
+     "The server is there and says the page is not."),
+    ("redirected", "Redirected to a different site",
+     "Landed somewhere other than where it pointed. Often fine, sometimes a sale."),
+    ("scheme",     "Only works on the other scheme",
+     "Failed as saved but answered on http instead of https, or the reverse. Worth updating."),
+    ("blocked",    "Refused or erroring (403 / 429 / 5xx)",
+     "Usually alive and refusing an automated fetch, or temporarily down. Not evidence of much."),
+    ("ok",         "Loaded and still looks right", "Nothing to do."),
+]
+
+
+def write_pages(results, outdir):
+    os.makedirs(outdir, exist_ok=True)
+    css = ("body{font:14px sans-serif;margin:2em;max-width:70em}"
+           "h1{font-size:1.4em}p.note{color:#555}"
+           "table{border-collapse:collapse;width:100%}"
+           "td,th{border-bottom:1px solid #ddd;padding:.35em .5em;vertical-align:top;text-align:left}"
+           "td.c{white-space:nowrap;color:#666}a{text-decoration:none}a:hover{text-decoration:underline}"
+           "nav a{margin-right:1em}")
+    counts = {}
+    for key, heading, note in GROUPS:
+        rows = [r for r in results if r[0] == key]
+        counts[key] = len(rows)
+        with open(os.path.join(outdir, key + ".html"), "w", encoding="utf-8") as f:
+            f.write("<!doctype html><meta charset='utf-8'><title>%s</title><style>%s</style>"
+                    % (html.escape(heading), css))
+            f.write("<nav><a href='index.html'>&larr; all groups</a></nav>")
+            f.write("<h1>%s <small>(%d)</small></h1><p class='note'>%s</p>"
+                    % (html.escape(heading), len(rows), html.escape(note)))
+            f.write("<table><tr><th>Saved as</th><th>Now titled</th><th>Code</th><th>Link</th></tr>")
+            for _, url, saved, code, final, title, err in sorted(rows, key=lambda r: r[2].lower()):
+                f.write("<tr><td>%s</td><td>%s</td><td class='c'>%s</td>"
+                        "<td><a href='%s'>%s</a></td></tr>"
+                        % (html.escape(saved or "(no name)"), html.escape(title or ""),
+                           html.escape(err or str(code)), html.escape(final or url),
+                           html.escape((final or url)[:90])))
+            f.write("</table>")
+
+    with open(os.path.join(outdir, "index.html"), "w", encoding="utf-8") as f:
+        f.write("<!doctype html><meta charset='utf-8'><title>Bookmark check</title>"
+                "<style>%s</style><h1>Bookmark check</h1>" % css)
+        f.write("<p class='note'>%d bookmarks checked. Nothing has been deleted.</p><table>" % len(results))
+        for key, heading, note in GROUPS:
+            f.write("<tr><td><a href='%s.html'>%s</a><br><span class='note'>%s</span></td>"
+                    "<td class='c'>%d</td></tr>" % (key, html.escape(heading), html.escape(note), counts[key]))
+        f.write("</table>")
+    return counts
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    workers = 10
+    for a in sys.argv[1:]:
+        if a.startswith("--workers"):
+            workers = int(a.split("=")[-1]) if "=" in a else 10
+    if not args:
+        print(__doc__); return 1
+    src = args[0]
+    outdir = args[1] if len(args) > 1 else os.path.expanduser("~/bookmark-check")
+
+    items = read_bookmarks(src)
+    print("%d bookmarks, %d workers" % (len(items), workers))
+    started = time.time()
+    results = []
+    with futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        for i, r in enumerate(pool.map(check, items), 1):
+            results.append(r)
+            if i % 200 == 0:
+                rate = i / (time.time() - started)
+                print("  %d/%d  (%.0f/min, ~%.0f min left)"
+                      % (i, len(items), rate * 60, (len(items) - i) / rate / 60), flush=True)
+
+    counts = write_pages(results, outdir)
+    print("\nfinished in %.1f minutes" % ((time.time() - started) / 60))
+    for key, heading, _ in GROUPS:
+        print("  %-11s %5d  %s" % (key, counts[key], heading))
+    print("\nopen: %s/index.html" % outdir)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
