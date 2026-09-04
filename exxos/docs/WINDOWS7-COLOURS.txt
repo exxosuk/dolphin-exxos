@@ -1,0 +1,48 @@
+# from <windows>/Users/<you>/NTUSER.DAT
+
+[Control Panel\Colors]   (R G B)
+  ActiveBorder             180 180 180  #b4b4b4
+  ActiveTitle              153 180 209  #99b4d1
+  AppWorkspace             171 171 171  #ababab
+  Background               0 0 0        #000000
+  ButtonAlternateFace      0 0 0        #000000
+  ButtonDkShadow           105 105 105  #696969
+  ButtonFace               240 240 240  #f0f0f0
+  ButtonHilight            255 255 255  #ffffff
+  ButtonLight              227 227 227  #e3e3e3
+  ButtonShadow             160 160 160  #a0a0a0
+  ButtonText               0 0 0        #000000
+  GradientActiveTitle      185 209 234  #b9d1ea
+  GradientInactiveTitle    215 228 242  #d7e4f2
+  GrayText                 109 109 109  #6d6d6d
+  Hilight                  51 153 255   #3399ff
+  HilightText              255 255 255  #ffffff
+  HotTrackingColor         0 102 204    #0066cc
+  InactiveBorder           244 247 252  #f4f7fc
+  InactiveTitle            191 205 219  #bfcddb
+  InactiveTitleText        67 78 84     #434e54
+  InfoText                 0 0 0        #000000
+  InfoWindow               255 255 225  #ffffe1
+  Menu                     240 240 240  #f0f0f0
+  MenuBar                  240 240 240  #f0f0f0
+  MenuHilight              51 153 255   #3399ff
+  MenuText                 0 0 0        #000000
+  Scrollbar                200 200 200  #c8c8c8
+  TitleText                0 0 0        #000000
+  Window                   255 255 255  #ffffff
+  WindowFrame              100 100 100  #646464
+  WindowText               0 0 0        #000000
+
+[DWM]   (Aero glass)
+  AlwaysHibernateThumbnails 0
+  ColorizationAfterglow    2785036203   #0047ab  alpha=166
+  ColorizationAfterglowBalance 12           #00000c  alpha=0
+  ColorizationBlurBalance  34           #000022  alpha=0
+  ColorizationColor        2785036203   #0047ab  alpha=166
+  ColorizationColorBalance 54           #000036  alpha=0
+  ColorizationGlassReflectionIntensity 50           #000032  alpha=0
+  ColorizationOpaqueBlend  0            #000000  alpha=0
+  Composition              1
+  CompositionPolicy        2
+  EnableAeroPeek           1
+  LastDisqualifiedCompositionSignature 307200

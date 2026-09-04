@@ -18,7 +18,20 @@
 # a running Chromium holds Preferences in memory and writes it back on exit,
 # which would silently undo this.
 set -u
-CHECK=0; [ "${1:-}" = "--check" ] && CHECK=1
+#   exxos-browser-theme --color '#d6d7d9'   set an explicit frame colour
+#
+# ABOUT --color
+# system_theme=1 makes Chromium follow the GTK colours, which on this desktop
+# are generated from the Exxos scheme. That is faithful, but Exxos's VIEW colour
+# is #fcfcfb -- near white -- and Chromium paints its toolbar from it, so a
+# focused window reads as washed out. (It looks right unfocused only because
+# dim-inactive is taking 10% off it.) An explicit colour overrides that without
+# touching the palette every other application uses.
+CHECK=0; COLOR=""
+case "${1:-}" in
+    --check) CHECK=1 ;;
+    --color) COLOR="${2:-}"; [ -n "$COLOR" ] || { echo "--color needs a value like '#d6d7d9'" >&2; exit 1; } ;;
+esac
 
 profiles() {
     for base in "$HOME/.config/google-chrome" \
@@ -52,7 +65,7 @@ while IFS= read -r pf; do
         echo "  $name: SKIPPED, the browser is running -- close it and run this again"
         continue
     fi
-    CHECK=$CHECK python3 - "$pf" "$name" <<'PY'
+    CHECK=$CHECK COLOR="$COLOR" python3 - "$pf" "$name" <<'PY'
 import json, os, shutil, sys
 pf, name = sys.argv[1], sys.argv[2]
 check = os.environ.get("CHECK") == "1"
@@ -61,10 +74,23 @@ try:
 except Exception as e:
     print("  %s: could not read Preferences (%s)" % (name, e)); sys.exit(0)
 
+color = os.environ.get("COLOR", "")
 theme = d.setdefault("extensions", {}).setdefault("theme", {})
 cur_sys = theme.get("system_theme")
 cur_frame = d.setdefault("browser", {}).get("custom_chrome_frame")
-want = (cur_sys != 1) or (cur_frame is not False)
+
+want_color = None
+if color:
+    h = color.lstrip("#")
+    if len(h) != 6:
+        print("  %s: --color wants six hex digits, got %r" % (name, color)); sys.exit(0)
+    # Chromium stores the colour as a SIGNED 32-bit ARGB integer.
+    argb = 0xFF000000 | int(h, 16)
+    want_color = argb - (1 << 32) if argb >= (1 << 31) else argb
+
+cur_user = d.get("browser", {}).get("theme", {}).get("user_color")
+want = (cur_sys != 1) or (cur_frame is not False) or want_color is not None \
+       or (want_color is None and cur_user is not None)
 
 if not want:
     print("  %s: already following the desktop theme" % name); sys.exit(0)
@@ -73,10 +99,27 @@ if check:
           % (name, cur_sys, cur_frame)); sys.exit(0)
 
 shutil.copy2(pf, pf + ".exxos-before")
-theme["system_theme"] = 1
 d["browser"]["custom_chrome_frame"] = False
+if want_color is None:
+    theme["system_theme"] = 1
+    # Clear any explicit colour, or it keeps overriding the system one -- which
+    # is how Brave ended up pinned to a near-white #f1f3f4 while Chrome, which
+    # had no user_color, correctly followed the desktop.
+    bt = d["browser"].get("theme", {})
+    for k in ("user_color", "color_variant"):
+        bt.pop(k, None)
+else:
+    # An explicit colour and "follow the system" are mutually exclusive.
+    theme["system_theme"] = 0
+    bt = d["browser"].setdefault("theme", {})
+    bt["user_color"] = want_color
+    bt["color_variant"] = 1
+    print("  %s: frame colour set to %s" % (name, color))
 json.dump(d, open(pf, "w"), separators=(",", ":"))
-print("  %s: system_theme=1, custom_chrome_frame=False  (backup: Preferences.exxos-before)" % name)
+if want_color is None:
+    print("  %s: system_theme=1, custom_chrome_frame=False  (backup: Preferences.exxos-before)" % name)
+else:
+    print("  %s: custom_chrome_frame=False  (backup: Preferences.exxos-before)" % name)
 PY
 done <<EOF
 $(profiles)

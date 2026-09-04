@@ -48,6 +48,14 @@ while IFS= read -r f; do
 done < <(find "$STAGE/usr/share/icons/$NAME" -name "*.svg" -size +900k)
 echo "  dropped $dropped"
 
+# Dropping those icons leaves symlinks pointing at files that are no longer
+# there. A dangling symlink is worse than a missing icon: the lookup finds a
+# name, tries to read it, and fails, instead of falling through the theme's
+# inherit chain to something that would have drawn.
+echo "Removing symlinks left dangling by the drop..."
+dangling=$(find "$STAGE/usr/share/icons/$NAME" -xtype l -print -delete | wc -l)
+echo "  removed $dangling"
+
 echo "Stripping editor metadata..."
 find "$STAGE/usr/share/icons/$NAME" -name "*.svg" -print0 \
     | xargs -0 -n 400 python3 "$HERE/svgtrim.py" | tail -1

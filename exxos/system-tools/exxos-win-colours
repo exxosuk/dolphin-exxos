@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Read the real colours out of a Windows installation's registry.
+
+    exxos-win-colours [/path/to/Users/<name>/NTUSER.DAT]
+
+Prints what Windows itself used, so the desktop can be matched to it instead of
+guessed at:
+
+  Control Panel\\Colors        the classic palette -- ActiveTitle, InactiveTitle,
+                              Window, ButtonFace, Menu, and the rest, as RGB
+  Software\\...\\Windows\\DWM    the Aero glass colour, its afterglow, and the
+                              balance values that decide how strong the tint is
+
+WHY IT PARSES THE HIVE ITSELF
+Reading a Windows hive normally means hivex or python-registry, and this machine
+has neither, no pip and no venv. The format is stable and only a small part of it
+is needed to walk to two keys, so that part is implemented here rather than
+adding a dependency to a script whose whole job is to be run once on a machine
+that may not have network access.
+"""
+import struct, sys, os, glob
+
+class Hive:
+    def __init__(self, path):
+        self.d = open(path, "rb").read()
+        if self.d[:4] != b"regf":
+            raise ValueError("not a registry hive: %s" % path)
+        self.root = struct.unpack_from("<I", self.d, 0x24)[0]
+
+    def cell(self, off):                      # cell data at a hive offset
+        base = 0x1000 + off
+        size = struct.unpack_from("<i", self.d, base)[0]
+        return self.d[base + 4: base + 4 + (abs(size) - 4)]
+
+    def subkeys(self, nk):
+        n = struct.unpack_from("<I", nk, 20)[0]
+        if n == 0:
+            return []
+        return self._list(struct.unpack_from("<I", nk, 28)[0])
+
+    def _list(self, off):
+        c = self.cell(off)
+        sig, count = c[:2], struct.unpack_from("<H", c, 2)[0]
+        out = []
+        if sig in (b"lf", b"lh"):
+            for i in range(count):
+                out.append(struct.unpack_from("<I", c, 4 + i * 8)[0])
+        elif sig == b"li":
+            for i in range(count):
+                out.append(struct.unpack_from("<I", c, 4 + i * 4)[0])
+        elif sig == b"ri":
+            for i in range(count):
+                out += self._list(struct.unpack_from("<I", c, 4 + i * 4)[0])
+        return out
+
+    def name(self, nk):
+        ln = struct.unpack_from("<H", nk, 72)[0]
+        raw = nk[76:76 + ln]
+        flags = struct.unpack_from("<H", nk, 2)[0]
+        return raw.decode("latin-1") if flags & 0x20 else raw.decode("utf-16-le", "replace")
+
+    def find(self, path):
+        nk = self.cell(self.root)
+        for part in path.split("\\"):
+            if not part:
+                continue
+            nxt = None
+            for off in self.subkeys(nk):
+                k = self.cell(off)
+                if k[:2] == b"nk" and self.name(k).lower() == part.lower():
+                    nxt = k; break
+            if nxt is None:
+                return None
+            nk = nxt
+        return nk
+
+    def values(self, nk):
+        n = struct.unpack_from("<I", nk, 36)[0]
+        if n == 0:
+            return {}
+        lst = self.cell(struct.unpack_from("<I", nk, 40)[0])
+        out = {}
+        for i in range(n):
+            off = struct.unpack_from("<I", lst, i * 4)[0]
+            v = self.cell(off)
+            if v[:2] != b"vk":
+                continue
+            nlen = struct.unpack_from("<H", v, 2)[0]
+            dsize = struct.unpack_from("<I", v, 4)[0]
+            doff = struct.unpack_from("<I", v, 8)[0]
+            dtype = struct.unpack_from("<I", v, 12)[0]
+            flags = struct.unpack_from("<H", v, 16)[0]
+            raw = v[20:20 + nlen]
+            nm = raw.decode("latin-1") if flags & 1 else raw.decode("utf-16-le", "replace")
+            if dsize & 0x80000000:            # small values live in the offset field
+                data = struct.pack("<I", doff)[: dsize & 0xFFFF]
+            else:
+                data = self.cell(doff)[:dsize]
+            if dtype == 1 or dtype == 2:      # REG_SZ / REG_EXPAND_SZ
+                out[nm or "(default)"] = data.decode("utf-16-le", "replace").rstrip("\x00")
+            elif dtype == 4 and len(data) >= 4:   # REG_DWORD
+                out[nm] = struct.unpack_from("<I", data, 0)[0]
+            else:
+                out[nm] = data
+        return out
+
+
+def guess_hive():
+    for pat in ("/media/*/*/Users/*/NTUSER.DAT", "/mnt/*/Users/*/NTUSER.DAT"):
+        for p in sorted(glob.glob(pat)):
+            if os.path.basename(os.path.dirname(p)) not in ("Default", "Default User", "All Users"):
+                return p
+    return None
+
+
+def main():
+    path = sys.argv[1] if len(sys.argv) > 1 else guess_hive()
+    if not path or not os.path.exists(path):
+        print("No NTUSER.DAT found. Mount the Windows partition and pass the path:")
+        print("  exxos-win-colours /media/you/WIN7/Users/you/NTUSER.DAT")
+        return 1
+    print("# from %s" % path)
+    h = Hive(path)
+
+    nk = h.find("Control Panel\\Colors")
+    if nk:
+        print("\n[Control Panel\\Colors]   (R G B)")
+        for k, v in sorted(h.values(nk).items()):
+            if isinstance(v, str) and v.replace(" ", "").isdigit():
+                parts = v.split()
+                if len(parts) == 3:
+                    print("  %-24s %-12s #%02x%02x%02x" % (k, v, *(int(x) for x in parts)))
+                    continue
+            print("  %-24s %s" % (k, v))
+
+    nk = h.find("Software\\Microsoft\\Windows\\DWM")
+    if nk:
+        print("\n[DWM]   (Aero glass)")
+        for k, v in sorted(h.values(nk).items()):
+            if isinstance(v, int) and "Color" in k:
+                print("  %-24s %-12s #%06x  alpha=%d" % (k, v, v & 0xFFFFFF, (v >> 24) & 0xFF))
+            elif isinstance(v, (int, str)):
+                print("  %-24s %s" % (k, v))
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

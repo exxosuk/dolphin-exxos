@@ -86,6 +86,14 @@ kwriteconfig5 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnRight IA
 
 # --- compositor: blur on, dim-inactive off (Win7 does not dim) ---
 kwriteconfig5 --file kwinrc --group Plugins --key blurEnabled true
+# Blur strength from Windows 7's own DWM setting: ColorizationBlurBalance=34
+# out of 100, read off a real installation, which is 5 on KWin's 1-15 scale.
+# At full strength the glass is opaque to detail -- the colour behind comes
+# through but every shape is smeared away, which reads as "the transparency is
+# not working". At 5 the title bar is seeably translucent without the text
+# behind it being legible enough to distract.
+kwriteconfig5 --file kwinrc --group Effect-blur --key BlurStrength 5
+kwriteconfig5 --file kwinrc --group Effect-blur --key NoiseStrength 0
 kwriteconfig5 --file kwinrc --group Plugins --key diminactiveEnabled false
 
 # --- window placement: centred, not Smart (which drifts left) ---
@@ -157,6 +165,16 @@ if command -v exxos-arrange-desktop >/dev/null 2>&1; then
     echo
     echo "Desktop icons..."
     exxos-arrange-desktop | sed 's/^/  /'
+fi
+
+# --- GTK colours ---
+# GTK apps, and Chromium browsers through them, read colors.css. Plasma only
+# regenerates it where kde-gtk-config is installed; without that it keeps
+# whatever it had and browsers stay on the previous palette indefinitely.
+if command -v exxos-gtk-colours >/dev/null 2>&1; then
+    echo
+    echo "GTK colours..."
+    exxos-gtk-colours "$HOME/.local/share/color-schemes/Exxos.colors" | sed 's/^/  /'
 fi
 
 # --- browsers ---

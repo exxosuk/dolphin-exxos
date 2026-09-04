@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""Write the KDE colour scheme into the GTK colour definitions.
+
+    exxos-gtk-colours [scheme.colors]
+
+WHY THIS EXISTS
+GTK applications -- and Chromium browsers, which take their toolbar colour from
+GTK -- read ~/.config/gtk-3.0/colors.css. On a machine with kde-gtk-config
+installed, Plasma regenerates that whenever the colour scheme changes. Without
+it nothing does, and the file simply keeps whatever it had: a browser toolbar
+stayed #d6d7d9 for hours after the scheme had moved to #f0f0f0, which looks
+exactly like the theme not applying to browsers at all.
+"""
+import configparser, os, re, sys, shutil
+
+SCHEME = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
+    "~/.local/share/color-schemes/Exxos.colors")
+GTK = os.path.expanduser("~/.config/gtk-3.0/colors.css")
+
+def main():
+    if not os.path.exists(SCHEME):
+        print("  no colour scheme at %s" % SCHEME); return 0
+    if not os.path.exists(GTK):
+        print("  no %s -- nothing to update" % GTK); return 0
+
+    cp = configparser.ConfigParser(strict=False); cp.optionxform = str
+    cp.read(SCHEME)
+
+    def rgb(group, key, dflt):
+        try:
+            r, g, b = [int(x) for x in cp.get(group, key).split(",")[:3]]
+            return "#%02x%02x%02x" % (r, g, b)
+        except Exception:
+            return dflt
+
+    mapping = {
+        "theme_bg_color":          rgb("Colors:Window", "BackgroundNormal", "#f0f0f0"),
+        "theme_base_color":        rgb("Colors:View", "BackgroundNormal", "#fcfcfb"),
+        "theme_fg_color":          rgb("Colors:Window", "ForegroundNormal", "#000000"),
+        "theme_text_color":        rgb("Colors:View", "ForegroundNormal", "#000000"),
+        "theme_selected_bg_color": rgb("Colors:Selection", "BackgroundNormal", "#3399ff"),
+        "theme_selected_fg_color": rgb("Colors:Selection", "ForegroundNormal", "#ffffff"),
+        "theme_button_background_normal": rgb("Colors:Button", "BackgroundNormal", "#f0f0f0"),
+        "theme_button_foreground_normal": rgb("Colors:Button", "ForegroundNormal", "#000000"),
+        "tooltip_background":      rgb("Colors:Tooltip", "BackgroundNormal", "#ffffe1"),
+        "tooltip_text":            rgb("Colors:Tooltip", "ForegroundNormal", "#000000"),
+        "content_view_bg":         rgb("Colors:View", "BackgroundNormal", "#fcfcfb"),
+    }
+
+    # --- browser corrections ---------------------------------------------
+    # Chromium browsers do not agree on which GTK colour is which:
+    #   Chrome paints its toolbar from theme_bg_color
+    #   Brave  paints its toolbar from theme_base_color, and the TAB STRIP
+    #          from theme_bg_color
+    # Left at the scheme's own values, Brave's toolbar took the near-white view
+    # colour and looked washed out beside Chrome. Pointing base at the window
+    # colour fixes that -- but then Brave's strip and toolbar were the same
+    # grey and the tabs had nothing to stand against, because Brave does not
+    # derive a darker strip the way Chrome does.
+    #
+    # So: toolbar = the window colour, tab strip = the same colour darkened.
+    # Only GTK is affected. Qt applications read the KDE scheme directly, so
+    # Dolphin's white list background is untouched.
+    win = mapping["theme_bg_color"]
+    def darken(hexcol, factor):
+        r, g, b = (int(hexcol[i:i+2], 16) for i in (1, 3, 5))
+        return "#%02x%02x%02x" % (round(r*factor), round(g*factor), round(b*factor))
+    mapping["theme_base_color"] = win
+    mapping["content_view_bg"]  = win
+    mapping["theme_bg_color"]   = darken(win, 0.82)
+    # No border override. Chromium does NOT take its tab stroke from the GTK
+    # border colour -- tried at #3c3c3c and #1e1e1e, neither produced an outline
+    # in Brave -- and setting it darkened every other GTK application's borders
+    # for nothing. Chrome does not outline unselected tabs either; the selected
+    # one simply sits lighter than the strip, which is what the contrast above
+    # provides.
+
+    s = open(GTK).read()
+    before = s
+    n = 0
+    for name, val in mapping.items():
+        # the generated file defines <name>_breeze and then aliases <name> to it
+        for pat in (r'(@define-color %s_breeze )#[0-9a-fA-F]{6};' % re.escape(name),
+                    r'(@define-color %s )#[0-9a-fA-F]{6};' % re.escape(name)):
+            s, c = re.subn(pat, lambda m: m.group(1) + val + ";", s)
+            n += c
+    if s == before:
+        print("  GTK colours already match the scheme"); return 0
+    shutil.copy2(GTK, GTK + ".exxos-before")
+    open(GTK, "w").write(s)
+    print("  GTK colours updated from %s (%d definitions)" % (os.path.basename(SCHEME), n))
+    print("  restart GTK apps and Chromium browsers to pick them up")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())
