@@ -546,7 +546,23 @@ void KStandardItemListWidget::paint(QPainter* painter, const QStyleOptionGraphic
         return;
     }
 
+    /* Exxos/Win7: keep the name inside the widget's own rect.
+
+       Same reason as the icon in drawPixmap(). A name that needs more room than
+       the widget claims -- a long one that wraps to a second line, or one that
+       arrives late and is longer than what was measured -- painted straight
+       over the top of whatever was next to it. Qt only invalidates the rect a
+       widget CLAIMS, so when that widget later moved or re-laid out, the spilled
+       pixels stayed on screen: the folder name appeared to be drawn twice, and
+       passing the mouse over it made the ghost go away because that forced a
+       repaint of the area.
+
+       Seen on an smb:// listing right after authenticating, where the names
+       arrive after the icons have already been placed. */
+    painter->save();
+    painter->setClipRect(QRectF(QPointF(0, 0), size()), Qt::IntersectClip);
     painter->drawStaticText(textInfo->pos, textInfo->staticText);
+    painter->restore();
 
     /* Exxos/Win7 tile: the capacity bar and the free-space line sit under the
        name.  Drawn here, after the name, so both land on top of the row
