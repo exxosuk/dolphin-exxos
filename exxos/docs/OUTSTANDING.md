@@ -23,9 +23,6 @@ If a fix ever appears absent again, check the window title says
 |---|---|---|
 | 1 | **CD/DVD bay in the Places panel** | Blocked. It can be listed, but only under "Places", not "Removable Devices", and `KFilePlacesModel` cannot be extended to fix that -- proof below. Needs replacing the model. |
 | 2 | **Card-reader slots under Removable Devices** | Same blocker as the row above. |
-| 3 | **`install.sh --check` checks the wrong worker** | It compares the root-owned copy under `/usr/lib`, which this build no longer loads. It reported STALE while the loaded worker was current, and would report OK while a stale one was in use. Should check what Dolphin resolves. |
-| 4 | **A stale `UnmountedByUser` record is never revalidated** | The record is only cleared by a running Dolphin seeing `accessibilityChanged`. Mount a drive while Dolphin is closed and it stays listed. Harmless today because the worker checks `mounted` before `locked`, so the view is still right — but the record lies. Validate it on startup. |
-| 5 | **`org.kde.plasma.showdesktop` override is unmanaged** | The PC carries one, `rebuild-overrides.sh` does not know about it, and it is a full copy of older Plasma QML — the exact silent-shadow failure the patch system exists to prevent. Decide whether it is needed; if not, delete it. |
 
 ## #2/#3 grouping: PROVEN unsafe, not merely awkward  (2026-09-02)
 
@@ -66,6 +63,12 @@ Ways in and out, all of which need to work:
 * Right-click an entry in Favourites -> Remove from Favourites. Removing takes
   away the link only, never the target.
 
+**Tabs.** Across the top of the Favourites view, so favourites can be grouped:
+Home, Work, Graphics, Programs, whatever the user wants. Users add and remove
+tabs themselves, and each tab is just a subsection of the list -- so on disk it
+is one directory of links per tab, which keeps the whole thing inspectable and
+backup-able. Dropping an item onto the view adds it to the tab currently shown.
+
 Notes for whoever builds it:
 
 * Symbolic links, not copies. A favourite that silently goes stale, or that
@@ -73,6 +76,8 @@ Notes for whoever builds it:
 * A link whose target has gone should be visible as broken rather than
   disappearing quietly or erroring on open -- the same argument as the padlock
   on an unmounted drive.
+* With tabs, the directory layout answers the design question below by itself:
+  `~/.local/share/exxos/favourites/<tab>/`, one directory per tab.
 * Places entries come from `user-places.xbel`. Whether Favourites is a section
   in that file or a directory of links under `~/.local/share/exxos/favourites`
   shown through a custom entry is the first design decision. The directory is

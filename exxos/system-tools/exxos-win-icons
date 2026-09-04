@@ -64,9 +64,12 @@ MAP="
 28:media-floppy drive-removable-media-floppy
 29:drive-harddisk drive-harddisk-usb drive-harddisk-system
 33:drive-removable-media drive-removable-media-usb media-removable
-37:media-optical drive-optical media-optical-recordable media-optical-data
-62:media-optical-cd-audio media-cdrom-audio
-63:media-optical-dvd media-dvd
+30:drive-optical drive-cdwriter drive-removable-media-dvd
+37:media-optical-dvd media-dvd drive-optical-dvd
+61:media-optical media-optical-data media-cdrom
+62:media-optical-recordable media-cdr
+63:media-optical-cd-audio media-cdrom-audio
+64:media-optical-rewritable media-cdrw
 54:user-trash trash-empty user-trash-symbolic
 55:user-trash-full trash-full
 73:folder-remote network-workgroup
@@ -113,7 +116,7 @@ while IFS= read -r line; do
     case "$id" in
         3|54|55|73|74)                 d=places ;;
         19|2|90|21|72|83|23|22|20|77)  d=mimetypes ;;
-        28|29|33|37|62|63|57|66|76)    d=devices ;;
+        28|29|30|33|37|61|62|63|64|57|66|76) d=devices ;;
         14|15|88)                      d=apps ;;
         8|84|81|59)                    d=actions ;;
         *)                             d=places ;;

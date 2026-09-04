@@ -1786,6 +1786,37 @@ void DolphinMainWindow::exxosScanNetwork()
    UniqueConnection keeps the repeat calls from stacking them up. */
 void DolphinMainWindow::exxosWatchAccessibility()
 {
+    /* Exxos/Win7: drop records that are no longer true.
+
+       The record is otherwise only ever cleared by a RUNNING Dolphin seeing
+       accessibilityChanged. Mount a drive while Dolphin is closed -- from the
+       places panel of another file manager, udisksctl, or by taking the medium
+       out and putting it back -- and nothing tells us, so the drive stays
+       listed as one the user unmounted. Measured: a partition sat in the record
+       while it was mounted at its usual mount point.
+
+       Harmless for what is drawn, because the worker checks "mounted" before
+       "locked", but a record that lies is a bug waiting for the next person who
+       trusts it. Every entry is checked once here, at the point the signals are
+       connected, which is the earliest moment Solid can answer. */
+    {
+        const KConfigGroup group(KSharedConfig::openConfig(), QStringLiteral("Exxos"));
+        const QStringList recorded =
+            group.readEntry("UnmountedByUser", QStringList());
+        for (const QString &udi : recorded) {
+            if (udi.isEmpty()) {
+                continue;
+            }
+            Solid::Device dev(udi);
+            const auto *access = dev.as<Solid::StorageAccess>();
+            /* Gone, or mounted again behind our back. Either way it is not a
+               drive the user has unmounted any more. */
+            if (!dev.isValid() || !access || access->isAccessible()) {
+                exxosSetUnmountedByUser(udi, false);
+            }
+        }
+    }
+
     const auto devices = Solid::Device::listFromType(Solid::DeviceInterface::StorageAccess, QString());
     for (const Solid::Device &dev : devices) {
         auto *access = const_cast<Solid::StorageAccess *>(dev.as<Solid::StorageAccess>());

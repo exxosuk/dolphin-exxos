@@ -6,6 +6,24 @@ Versions are `major.minor.patch`: the patch number moves with each change, the
 minor number with each push to the repository. `exxos-desktop` and
 `exxos-icons` are released together and share a version number.
 
+## Unreleased
+
+* `install.sh --check` now reports the worker Dolphin actually loads. It only
+  ever compared the root-owned copy under `/usr/lib`, which this build does not
+  load once a copy exists in `~/.local` -- so it said STALE while the loaded
+  worker was current, and would have said CURRENT while a stale one was in use.
+  It also asks any running worker where it was loaded from.
+* The record of drives the user unmounted is revalidated at startup. It was only
+  ever cleared by a running Dolphin seeing `accessibilityChanged`, so mounting a
+  drive with Dolphin closed left it listed as unmounted indefinitely.
+* `org.kde.plasma.showdesktop` was a local override byte-identical to the system
+  copy: it changed nothing and would have silently shadowed a future Plasma.
+  Removed.
+* `rebuild-overrides.sh --check` now reports any plasmoid override it does not
+  manage, distinguishing one that carries no changes from one that does. It
+  found `org.kde.plasma.digitalclock` immediately -- real Win7 clock proportions
+  that nothing was maintaining -- which is now a patch like the rest.
+
 ## 1.9.21
 
 * Removed a tool from the package that should not have been in it. 1.9.20 was

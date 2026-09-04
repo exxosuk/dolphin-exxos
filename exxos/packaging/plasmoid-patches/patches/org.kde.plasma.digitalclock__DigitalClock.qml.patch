@@ -1,0 +1,29 @@
+--- a/contents/ui/DigitalClock.qml
++++ b/contents/ui/DigitalClock.qml
+@@ -170,7 +170,7 @@
+             PropertyChanges {
+                 target: dateLabel
+ 
+-                height: 0.8 * timeLabel.height
++                height: 0.6 * timeLabel.height
+                 width: dateLabel.paintedWidth
+                 verticalAlignment: Text.AlignVCenter
+ 
+@@ -194,7 +194,7 @@
+                  * the time label is slightly larger than the date or timezone label
+                  * and still fits well into the panel with all the applied margins.
+                  */
+-                height: Math.min(main.showDate || timezoneLabel.visible ? main.height * 0.56 : main.height * 0.71,
++                height: Math.min(main.showDate || timezoneLabel.visible ? main.height * 0.58 : main.height * 0.71,
+                                  fontHelper.font.pixelSize)
+ 
+                 font.pixelSize: sizehelper.height
+@@ -334,7 +334,7 @@
+                 verticalAlignment: Text.AlignTop
+                 // Those magic numbers are purely what looks nice as maximum size, here we have it the smallest
+                 // between slightly bigger than the default font (1.4 times) and a bit smaller than the time font
+-                font.pixelSize: Math.min(0.7 * timeLabel.height, PlasmaCore.Theme.defaultFont.pixelSize * 1.4)
++                font.pixelSize: Math.min(0.525 * timeLabel.height, PlasmaCore.Theme.defaultFont.pixelSize * 1.4)
+                 elide: Text.ElideRight
+                 wrapMode: Text.WordWrap
+             }
