@@ -1,0 +1,157 @@
+#!/bin/bash
+# Install the real Windows icons from a mounted Windows partition.
+#
+#   exxos-win-icons              find a Windows install and use it
+#   exxos-win-icons /media/.../Windows
+#   exxos-win-icons --undo       stop using them
+#
+# WHY
+# The Win7-style icon theme is a Linux-made imitation. Side by side with the
+# genuine article its folders are about 10% brighter and flatter -- measured at
+# 48px, body #EED56E against Microsoft's #D8C066 -- which is why they wash out
+# against a near-white file list.
+#
+# LICENSING, WHICH IS THE WHOLE REASON THIS IS A TOOL AND NOT A PACKAGE
+# These icons are Microsoft's. They are not redistributable, so they are NOT
+# shipped in exxos-icons and never will be. This extracts them from a Windows
+# installation the person running it already has a licence for, onto that same
+# machine. Nothing leaves the machine.
+#
+# Icons are installed as a SEPARATE theme that inherits the Exxos one, so every
+# icon not extracted still comes from there, and --undo is a one-line revert.
+set -u
+NAME="Exxos-Win7-real"
+DEST="$HOME/.local/share/icons/$NAME"
+BASE="Win7-plasma5up-scalable-icontheme-blackysgate.de"
+
+if [ "${1:-}" = "--undo" ]; then
+    kwriteconfig5 --file kdeglobals --group Icons --key Theme "$BASE"
+    rm -rf "$DEST"
+    rm -f "$HOME/.cache/icon-cache.kcache" 2>/dev/null
+    echo "Reverted to $BASE. Log out and back in."
+    exit 0
+fi
+
+command -v wrestool >/dev/null 2>&1 && command -v icotool >/dev/null 2>&1 || {
+    echo "Needs icoutils:  sudo apt install icoutils" >&2; exit 1; }
+
+WINDIR="${1:-}"
+if [ -z "$WINDIR" ]; then
+    for c in /media/*/*/Windows /mnt/*/Windows; do
+        [ -f "$c/System32/imageres.dll" ] && { WINDIR="$c"; break; }
+    done
+fi
+[ -n "$WINDIR" ] && [ -f "$WINDIR/System32/imageres.dll" ] || {
+    echo "No Windows installation found. Mount it and pass the path:" >&2
+    echo "  exxos-win-icons /media/you/<windows>/Windows" >&2; exit 1; }
+echo "Using $WINDIR"
+
+# resource id in imageres.dll -> the freedesktop names it should answer to.
+# Identified by extracting every group and looking at them; ids are stable
+# across Windows 7 installs.
+MAP="
+3:folder inode-directory folder-open folder-visiting folder-drag-accept
+19:text-x-generic text-plain text-x-plain text-x-readme text-x-log
+2:application-x-zerosize empty unknown application-octet-stream
+90:text-x-script application-x-shellscript text-x-makefile
+21:image-x-generic image-jpeg image-png image-bmp image-gif image-tiff
+72:image-x-generic-symbolic multimedia-photo-manager
+83:image-x-krita image-x-photo
+23:video-x-generic video-mp4 video-x-matroska applications-multimedia
+22:audio-x-generic audio-mpeg audio-x-wav multimedia-player
+20:internet-mail message-rfc822 mail-message
+77:font-x-generic application-x-font-ttf application-x-font-otf preferences-desktop-font
+28:media-floppy drive-removable-media-floppy
+29:drive-harddisk drive-harddisk-usb drive-harddisk-system
+33:drive-removable-media drive-removable-media-usb media-removable
+37:media-optical drive-optical media-optical-recordable media-optical-data
+62:media-optical-cd-audio media-cdrom-audio
+63:media-optical-dvd media-dvd
+54:user-trash trash-empty user-trash-symbolic
+55:user-trash-full trash-full
+73:folder-remote network-workgroup
+74:folder-network network-server remote
+14:applications-games input-gaming
+15:applications-other application-x-executable applications-system
+8:system-search edit-find folder-saved-search
+57:camera-photo camera
+66:phone smartphone
+76:printer printer-network document-print
+84:dialog-warning
+81:dialog-information
+88:system-users user-identity
+59:object-locked security-high changes-prevent
+"
+
+TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+wrestool -x -t 14 "$WINDIR/System32/imageres.dll" -o "$TMP" >/dev/null 2>&1 || {
+    echo "Could not read icons out of imageres.dll" >&2; exit 1; }
+
+made=0
+for size in 16 24 32 48 64 128 256; do
+    mkdir -p "$DEST/${size}x${size}/places" "$DEST/${size}x${size}/mimetypes" \
+             "$DEST/${size}x${size}/devices" "$DEST/${size}x${size}/apps" \
+             "$DEST/${size}x${size}/actions"
+done
+
+# read line by line: `for x in $MAP` splits on every space, so only the first
+# name of each mapping was ever used.
+while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    id="${line%%:*}"; names="${line#*:}"
+    src="$TMP/imageres.dll_14_${id}.ico"
+    [ -f "$src" ] || continue
+    # Take the 256px entry and scale it down, rather than pulling each size
+    # out of the .ico. icotool cannot read this file's older 4- and 8-bit
+    # entries -- it warns "clr_important field in bitmap should be zero" and
+    # writes nothing -- so only 256, stored as PNG, comes out reliably. Scaling
+    # that gives a better result than the legacy low-depth bitmaps anyway.
+    big="$TMP/big_${id}.png"
+    icotool -x -w 256 -h 256 -o "$big" "$src" 2>/dev/null
+    [ -s "$big" ] || icotool -x -w 48 -o "$big" "$src" 2>/dev/null
+    [ -s "$big" ] || continue
+    case "$id" in
+        3|54|55|73|74)                 d=places ;;
+        19|2|90|21|72|83|23|22|20|77)  d=mimetypes ;;
+        28|29|33|37|62|63|57|66|76)    d=devices ;;
+        14|15|88)                      d=apps ;;
+        8|84|81|59)                    d=actions ;;
+        *)                             d=places ;;
+    esac
+    for size in 16 24 32 48 64 128 256; do
+        out="$TMP/x_${id}_${size}.png"
+        convert "$big" -resize ${size}x${size} PNG32:"$out" 2>/dev/null || continue
+        [ -s "$out" ] || continue
+        for n in $names; do
+            cp "$out" "$DEST/${size}x${size}/$d/$n.png" && made=$((made+1))
+        done
+    done
+done <<EOF
+$MAP
+EOF
+
+cat > "$DEST/index.theme" <<INDEX
+[Icon Theme]
+Name=$NAME
+Comment=Icons taken from this machine's own Windows installation
+Inherits=$BASE,breeze,hicolor
+Directories=$(for s in 16 24 32 48 64 128 256; do for d in places mimetypes devices apps actions; do printf '%sx%s/%s,' $s $s $d; done; done | sed 's/,$//')
+INDEX
+for s in 16 24 32 48 64 128 256; do
+    for d in places mimetypes devices apps actions; do
+        cat >> "$DEST/index.theme" <<ENTRY
+
+[${s}x${s}/${d}]
+Size=${s}
+Context=$(echo "$d" | sed 's/places/Places/;s/mimetypes/MimeTypes/;s/devices/Devices/;s/apps/Applications/;s/actions/Actions/')
+Type=Fixed
+ENTRY
+    done
+done
+
+gtk-update-icon-cache -qf "$DEST" 2>/dev/null || true
+kwriteconfig5 --file kdeglobals --group Icons --key Theme "$NAME"
+rm -f "$HOME/.cache/icon-cache.kcache" 2>/dev/null
+
+echo "Installed $made icon files as theme '$NAME', inheriting $BASE."
+echo "Log out and back in. Undo with: exxos-win-icons --undo"

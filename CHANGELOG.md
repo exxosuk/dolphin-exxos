@@ -6,9 +6,7 @@ Versions are `major.minor.patch`: the patch number moves with each change, the
 minor number with each push to the repository. `exxos-desktop` and
 `exxos-icons` are released together and share a version number.
 
-## Unreleased
-
-### 1.9.20 — colours and blur measured rather than guessed
+## 1.9.20 — colours and blur measured rather than guessed
 
 **Colours.** `exxos-win-colours` reads the palette out of a Windows registry
 hive, so the scheme now carries real values instead of approximations: window
@@ -53,7 +51,7 @@ Locations order by when a thing was used rather than by file modification time,
 which had buried anything on a drive that is only ever read from. "Send to
 Desktop (create shortcut)" added to the item context menu.
 
-### Dolphin Exxos Edition 1.9.0 — the unmount work, and the plasmoid patches made to apply
+## 1.9.0 — the unmount work, and the plasmoid patches made to apply
 
 The PC and the laptop had drifted apart: the PC carried 1.8.10 to 1.8.13, none of
 which had ever been pushed, while the laptop had pushed theme work the PC had
@@ -153,6 +151,40 @@ Fixed:
   Windows 7. It reproduces one personal Windows 7 setup — the taskbar, Start
   menu and colours as they were arranged there — not the stock layout. What
   carries over is the way it behaves, not the pixels.
+
+## 1.8.5 to 1.8.9 — unmounting a drive means something
+
+* Unmount appeared to do nothing. The guard that makes it stick lived in a KIO
+  worker Dolphin was not loading, because only the wrapper script set
+  `QT_PLUGIN_PATH`. Dolphin now prepends its own plugin directory, so the
+  launcher cannot be bypassed.
+* A drive the user unmounted is drawn as unavailable and refuses to open, with
+  a padlock rather than the redundant red star.
+* The record follows the drive: written only on a successful teardown, cleared
+  when the drive is mounted again by any route, cleared when the medium is
+  removed.
+* `dolphinrc` is read without QSettings, which had been returning stale values.
+
+## 1.8.0 to 1.8.4 — the search panel
+
+* Two named search lists, with air under the options row.
+* Search controls no longer depend on window width.
+* The busy bar stops when the search is stopped.
+* Searching Computer no longer produces `computer:` URLs that nothing can open.
+* Search results take the keyboard when they arrive.
+
+## 1.7.0 to 1.7.1 — search results that other programs can open
+
+* Results are given as real file URLs, so other applications can open them.
+* A visible stop control, and saved searches head the drop-down.
+
+## 1.6.0 — wildcards in search
+
+* Wildcards in the search field, and a stop button that actually stops.
+
+Versions between those headings were build numbers rather than releases: the
+patch number moves with every change, so not all of them describe something a
+user would notice.
 
 ## 1.5.2
 
